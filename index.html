@@ -619,12 +619,23 @@
         const dbUrl = 'https://github.com/hmcrcx/universal-spatial-search-engine/releases/latest/download/PRN_Data.db.gz';
 
         fetch(dbUrl)
-            .then(response => {
+            .then(async response => {
                 if (!response.ok) throw new Error("Network response was not ok: " + response.statusText);
-                updateLoadingProgress(60, "Decompressing database stream...");
+                updateLoadingProgress(60, "Processing database stream...");
                 
-                const ds = new DecompressionStream('gzip');
-                return new Response(response.body.pipeThrough(ds)).arrayBuffer();
+                // Read the raw response as a buffer first
+                const rawBuffer = await response.arrayBuffer();
+                
+                try {
+                    // Try to decompress it (in case the browser didn't do it automatically)
+                    const ds = new DecompressionStream('gzip');
+                    const stream = new Response(rawBuffer).body.pipeThrough(ds);
+                    return await new Response(stream).arrayBuffer();
+                } catch (e) {
+                    // If it fails, the browser likely already decompressed it for us!
+                    console.log("Stream decompression skipped (file likely auto-decompressed by browser).");
+                    return rawBuffer;
+                }
             })
             .then(arrayBuffer => {
                 const finalBinary = new Uint8Array(arrayBuffer);
@@ -638,8 +649,8 @@
                 };
             })
             .catch(err => {
-                console.error(err);
-                updateLoadingProgress(0, "Error downloading database asset.");
+                console.error("Download Error Details:", err);
+                updateLoadingProgress(0, "Error downloading database asset. Check console for details.");
             });
     }
 
