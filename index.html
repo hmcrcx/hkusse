@@ -612,47 +612,58 @@
         };
     }
 
-    function downloadAndCachePayload(newVersionStr) {
-        updateLoadingProgress(30, "Downloading database binary (~80MB)...");
+    async function downloadAndCachePayload(newVersionStr) {
+    updateLoadingProgress(30, "Downloading database chunks...");
+    
+    try {
+        let chunks = [];
+        let partNum = 1;
+        
+        // Dynamically fetch parts until we hit a 404 (meaning no more parts exist)
+        while (true) {
+            updateLoadingProgress(30 + (partNum * 10), `Downloading database part ${partNum}...`);
+            let response = await fetch(`PRN_Data.part${partNum}`);
+            
+            if (!response.ok) {
+                if (response.status === 404 && partNum > 1) break; // Reached the end of the chunks
+                throw new Error(`Failed to fetch part ${partNum}`);
+            }
+            chunks.push(await response.arrayBuffer());
+            partNum++;
+        }
+        
+        updateLoadingProgress(70, "Merging and decompressing database...");
+        
+        // Stitch the chunks back together in RAM
+        let totalLen = chunks.reduce((acc, val) => acc + val.byteLength, 0);
+        let merged = new Uint8Array(totalLen);
+        let offset = 0;
+        for (let ch of chunks) {
+            merged.set(new Uint8Array(ch), offset);
+            offset += ch.byteLength;
+        }
+        
+        // Decompress the merged binary
+        const blob = new Blob([merged]);
+        const ds = new DecompressionStream('gzip');
+        const decompressedStream = blob.stream().pipeThrough(ds);
+        const arrayBuffer = await new Response(decompressedStream).arrayBuffer();
+        
+        const finalBinary = new Uint8Array(arrayBuffer);
+        updateLoadingProgress(85, "Caching database to local storage...");
+        
+        const tx = localStore.transaction(["files"], "readwrite");
+        tx.objectStore("files").put({ id: "masterDB", data: finalBinary });
+        tx.oncomplete = () => {
+            localStorage.setItem('cachedDbVersion', newVersionStr);
+            setTimeout(() => loadDatabaseIntoMemory(finalBinary, newVersionStr), 50);
+        };
 
-        // IMPORTANT: Replace these with your actual GitHub username and repository name!
-        const dbUrl = 'https://github.com/hmcrcx/universal-spatial-search-engine/releases/latest/download/PRN_Data.db.gz';
-
-        fetch(dbUrl)
-            .then(async response => {
-                if (!response.ok) throw new Error("Network response was not ok: " + response.statusText);
-                updateLoadingProgress(60, "Processing database stream...");
-                
-                // Read the raw response as a buffer first
-                const rawBuffer = await response.arrayBuffer();
-                
-                try {
-                    // Try to decompress it (in case the browser didn't do it automatically)
-                    const ds = new DecompressionStream('gzip');
-                    const stream = new Response(rawBuffer).body.pipeThrough(ds);
-                    return await new Response(stream).arrayBuffer();
-                } catch (e) {
-                    // If it fails, the browser likely already decompressed it for us!
-                    console.log("Stream decompression skipped (file likely auto-decompressed by browser).");
-                    return rawBuffer;
-                }
-            })
-            .then(arrayBuffer => {
-                const finalBinary = new Uint8Array(arrayBuffer);
-                updateLoadingProgress(85, "Caching database to local storage...");
-                
-                const tx = localStore.transaction(["files"], "readwrite");
-                tx.objectStore("files").put({ id: "masterDB", data: finalBinary });
-                tx.oncomplete = () => {
-                    localStorage.setItem('cachedDbVersion', newVersionStr);
-                    setTimeout(() => loadDatabaseIntoMemory(finalBinary, newVersionStr), 50);
-                };
-            })
-            .catch(err => {
-                console.error("Download Error Details:", err);
-                updateLoadingProgress(0, "Error downloading database asset. Check console for details.");
-            });
+    } catch(err) {
+        console.error("Download Error Details:", err);
+        updateLoadingProgress(0, "Error downloading chunks. Check console.");
     }
+}
 
     function loadDatabaseIntoMemory(uInt8Array, dbVersion) {
         updateLoadingProgress(85, "Initializing Spatial Engine...");
