@@ -616,7 +616,7 @@
         updateLoadingProgress(30, "Downloading database from Cloudflare...");
         try {
             // REPLACE THIS URL WITH YOUR ACTUAL R2.DEV BUCKET URL + FILENAME
-            const dbUrl = 'https://pub-YOUR-R2-DEV-LINK.r2.dev/PRN_Data.db.gz';
+            const dbUrl = 'https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev/PRN_Data.db.gz';
 
             const response = await fetch(dbUrl);
             if (!response.ok) throw new Error("Network error: " + response.statusText);
