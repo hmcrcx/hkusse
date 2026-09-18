@@ -1,4 +1,4 @@
-const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1';
+const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
 let SQLiteESMFactory = null;
 let SQLite = null;
 let OPFSAnyContextVFS = null;
