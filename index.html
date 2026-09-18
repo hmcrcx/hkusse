@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light">
     <title>Universal Spatial Search Engine</title>
+    <link rel="icon" type="image/png" href="favicon.png">
 
     <!--
       External libraries are version-pinned. sql.js itself is loaded inside a Web Worker.
@@ -965,8 +966,7 @@
            ================================================================ */
         const DB_BASE_URL = 'https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev';
         const MANIFEST_OBJECT = 'database-manifest.json';
-        // Manifest + autocomplete dictionary are hosted on GitHub Pages (same origin).
-        // The large SQLite database remains on Cloudflare R2.
+        // Tiny control assets stay on GitHub Pages. Only the large SQLite database is fetched from R2.
         const MANIFEST_SAME_ORIGIN = true;
 
         // sql.js is loaded INSIDE the worker so SQLite parsing/querying cannot block the UI.
@@ -1387,7 +1387,7 @@
         }
 
         async function downloadAndInitDB(manifest, signal) {
-            const url = absoluteR2Url(manifest.database.file);
+            const url = absoluteR2Url(manifest.database.file) + `?v=${encodeURIComponent(manifest.database.sha256 || manifest.builtAtUtc || Date.now())}`;
             setLoading(20, 'Downloading database…', 'First visit or a new database version.');
             const compressed = await fetchWithProgress(url, {
                 signal,
@@ -1421,7 +1421,7 @@
 
             let manifest = null;
             try {
-                setLoading(10, 'Checking database manifest…', 'The manifest is tiny; the large database is only fetched when its hash changes.');
+                setLoading(10, 'Checking database manifest…', 'Reading the tiny same-origin database pointer.');
                 // Manifest intentionally gets a cache-busting query: it is the tiny pointer
                 // that must reflect the latest database build.
                 const manifestUrl = MANIFEST_SAME_ORIGIN
