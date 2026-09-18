@@ -1,6 +1,39 @@
-import SQLiteESMFactory from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1/dist/wa-sqlite-async.mjs';
-import * as SQLite from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1/src/sqlite-api.js';
-import { OPFSAnyContextVFS } from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1/src/examples/OPFSAnyContextVFS.js';
+const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1';
+let SQLiteESMFactory = null;
+let SQLite = null;
+let OPFSAnyContextVFS = null;
+let sqliteImportsPromise = null;
+
+async function loadSQLiteModules() {
+  if (!sqliteImportsPromise) {
+    sqliteImportsPromise = Promise.all([
+      import(`${WA_SQLITE_BASE}/dist/wa-sqlite-async.mjs`),
+      import(`${WA_SQLITE_BASE}/src/sqlite-api.js`),
+      import(`${WA_SQLITE_BASE}/src/examples/OPFSAnyContextVFS.js`)
+    ]).then(([factoryModule, apiModule, vfsModule]) => {
+      SQLiteESMFactory = factoryModule.default;
+      SQLite = apiModule;
+      OPFSAnyContextVFS = vfsModule.OPFSAnyContextVFS;
+      if (!SQLiteESMFactory || !SQLite || !OPFSAnyContextVFS) {
+        throw new Error('wa-sqlite module exports are incomplete.');
+      }
+    });
+  }
+  return sqliteImportsPromise;
+}
+
+self.addEventListener('error', (event) => {
+  try {
+    self.postMessage({ id: 0, type: 'bootstrapError', error: event?.message || 'Worker script error' });
+  } catch (_) {}
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  try {
+    const reason = event?.reason?.message || String(event?.reason || 'Unhandled worker rejection');
+    self.postMessage({ id: 0, type: 'bootstrapError', error: reason });
+  } catch (_) {}
+});
 
 const VFS_NAME = 'usse-opfs-any-vfs';
 const DB_FILE = 'USSE_PRN.db';
@@ -20,6 +53,7 @@ function ensureSupported() {
 async function ensureSQLite() {
   ensureSupported();
   if (sqlite3) return;
+  await loadSQLiteModules();
   sqliteModule = await SQLiteESMFactory();
   sqlite3 = SQLite.Factory(sqliteModule);
   vfs = await OPFSAnyContextVFS.create(VFS_NAME, sqliteModule);

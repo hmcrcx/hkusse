@@ -1008,10 +1008,20 @@
                 try { appState.worker.terminate(); } catch (_) {}
                 appState.worker = null;
             }
-            const workerUrl = new URL('./sqlite-worker.js?v=20260918-ios2', document.baseURI);
-            const worker = new Worker(workerUrl, { type: 'module' });
+            const workerUrl = new URL('./sqlite-worker.js?v=20260918-ios3', document.baseURI);
+            const worker = new Worker(workerUrl);
             worker.onmessage = event => {
                 const message = event.data || {};
+                if (message.type === 'bootstrapError') {
+                    const detail = message.error || 'Worker bootstrap failed.';
+                    console.error('SQLite worker bootstrap error:', detail);
+                    setLoading(8, 'SQLite worker failed to load', detail);
+                    setDBStatus('error', 'SQLite worker unavailable');
+                    setSourceStatus('db', 'error', 'Local DB: worker failed');
+                    for (const pending of appState.workerRequests.values()) pending.reject(new Error(detail));
+                    appState.workerRequests.clear();
+                    return;
+                }
                 if (message.type === 'progress') {
                     if (message.stage === 'download') {
                         const received = Number(message.received || 0);
