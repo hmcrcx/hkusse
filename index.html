@@ -967,8 +967,8 @@
         const MANIFEST_OBJECT = 'database-manifest.json';
 
         // sql.js is loaded INSIDE the worker so SQLite parsing/querying cannot block the UI.
-        const SQL_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.14.2/sql-wasm.js';
-        const SQL_WASM_BASE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.14.2/';
+        const SQL_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.14.1/sql-wasm.js';
+        const SQL_WASM_BASE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.14.1/';
 
         const DUMMY_NUMBERS = new Set(['1111','2222','3333','4444','5555','6666','7777','8888','9999']);
         const RESULT_FIELDS = [
@@ -999,7 +999,7 @@
             idb: null
         };
 
-        proj4.defs('EPSG:2326', '+proj=tmerc +lat_0=22.31213333333334 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,0.067753,-2.24365,-1.15883,-1.09425 +units=m +no_defs');
+        proj4.defs('EPSG:2326', '+proj=tmerc +lat_0=22.31213333333334 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,-1.09425 +units=m +no_defs');
 
         /* ================================================================
            WORKER
@@ -1170,19 +1170,7 @@
                 else pending.reject(new Error(message.error || 'Worker error'));
             };
             worker.onerror = event => {
-                const message = event?.message || 'SQLite worker failed to start.';
-                console.error('SQLite worker error:', message, event);
-                for (const pending of appState.workerRequests.values()) {
-                    pending.reject(new Error(message));
-                }
-                appState.workerRequests.clear();
-            };
-            worker.onmessageerror = event => {
-                console.error('SQLite worker message error:', event);
-                for (const pending of appState.workerRequests.values()) {
-                    pending.reject(new Error('SQLite worker message error.'));
-                }
-                appState.workerRequests.clear();
+                console.error('SQLite worker error:', event.message);
             };
             appState.worker = worker;
             return worker;
@@ -1420,10 +1408,7 @@
                 // Manifest intentionally gets a cache-busting query: it is the tiny pointer
                 // that must reflect the latest database build.
                 const manifestUrl = `${absoluteR2Url(MANIFEST_OBJECT)}?v=${Date.now()}`;
-                // Do not send Cache-Control as a request header here: it is not a
-                // CORS-safelisted request header and can trigger an R2 preflight.
-                // The timestamp query already makes this tiny manifest URL unique.
-                manifest = await fetchJson(manifestUrl, { label: 'Database manifest', retries: 2, timeoutMs: 9000 });
+                manifest = await fetchJson(manifestUrl, { label: 'Database manifest', retries: 2, timeoutMs: 9000, headers: { 'Cache-Control': 'no-cache' } });
                 appState.manifest = manifest;
             } catch (error) {
                 console.warn('Manifest unavailable; attempting offline cache.', error);
