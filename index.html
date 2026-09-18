@@ -1008,7 +1008,7 @@
                 try { appState.worker.terminate(); } catch (_) {}
                 appState.worker = null;
             }
-            const workerUrl = new URL('./sqlite-worker.js', document.baseURI);
+            const workerUrl = new URL('./sqlite-worker.js?v=20260918-ios2', document.baseURI);
             const worker = new Worker(workerUrl, { type: 'module' });
             worker.onmessage = event => {
                 const message = event.data || {};
@@ -1039,7 +1039,8 @@
                 else pending.reject(new Error(message.error || 'SQLite worker error'));
             };
             worker.onerror = event => {
-                const message = event?.message || 'SQLite worker failed to start.';
+                const detail = [event?.message, event?.filename, event?.lineno && `line ${event.lineno}`, event?.colno && `col ${event.colno}`].filter(Boolean).join(' | ');
+                const message = detail || 'SQLite worker failed to start. Open Network > sqlite-worker.js and check for a failed module/WASM request.';
                 console.error('SQLite worker error:', message, event);
                 for (const pending of appState.workerRequests.values()) pending.reject(new Error(message));
                 appState.workerRequests.clear();
@@ -1242,7 +1243,7 @@
                 await openIndexedDB();
                 createWorker();
                 setSourceStatus('db', 'pending', 'Local DB: preparing');
-                setLoading(8, 'Starting SQLite storage engine…', 'Using OPFS-backed SQLite for mobile-friendly memory usage.');
+                setLoading(8, 'Starting SQLite storage engine…', 'Using OPFS-backed, read-only SQLite for mobile-friendly memory usage.');
                 await workerCall('prepare');
             } catch (error) {
                 console.error('Local SQLite startup failed:', error);

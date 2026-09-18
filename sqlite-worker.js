@@ -1,8 +1,8 @@
-import SQLiteESMFactory from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.0.7/dist/wa-sqlite.mjs';
-import * as SQLite from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.0.7/src/sqlite-api.js';
-import { OPFSCoopSyncVFS } from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.0.7/src/examples/OPFSCoopSyncVFS.js';
+import SQLiteESMFactory from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1/dist/wa-sqlite-async.mjs';
+import * as SQLite from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1/src/sqlite-api.js';
+import { OPFSAnyContextVFS } from 'https://cdn.jsdelivr.net/npm/wa-sqlite@1.1.1/src/examples/OPFSAnyContextVFS.js';
 
-const VFS_NAME = 'usse-opfs-vfs';
+const VFS_NAME = 'usse-opfs-any-vfs';
 const DB_FILE = 'USSE_PRN.db';
 let sqliteModule = null;
 let sqlite3 = null;
@@ -22,7 +22,7 @@ async function ensureSQLite() {
   if (sqlite3) return;
   sqliteModule = await SQLiteESMFactory();
   sqlite3 = SQLite.Factory(sqliteModule);
-  vfs = await OPFSCoopSyncVFS.create(VFS_NAME, sqliteModule);
+  vfs = await OPFSAnyContextVFS.create(VFS_NAME, sqliteModule);
   sqlite3.vfs_register(vfs, true);
 }
 
