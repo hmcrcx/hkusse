@@ -1,21 +1,21 @@
 const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
-const WORKER_BUILD = '20260921-stable-shortname';
+const WORKER_BUILD = '20260921-anycontext-refresh-fix';
 let SQLiteESMFactory = null;
 let SQLite = null;
-let OPFSCoopSyncVFS = null;
+let OPFSAnyContextVFS = null;
 let sqliteImportsPromise = null;
 
 async function loadSQLiteModules() {
   if (!sqliteImportsPromise) {
     sqliteImportsPromise = Promise.all([
-      import(`${WA_SQLITE_BASE}/dist/wa-sqlite.mjs`),
+      import(`${WA_SQLITE_BASE}/dist/wa-sqlite-async.mjs`),
       import(`${WA_SQLITE_BASE}/src/sqlite-api.js`),
-      import(`${WA_SQLITE_BASE}/src/examples/OPFSCoopSyncVFS.js`)
+      import(`${WA_SQLITE_BASE}/src/examples/OPFSAnyContextVFS.js`)
     ]).then(([factoryModule, apiModule, vfsModule]) => {
       SQLiteESMFactory = factoryModule.default;
       SQLite = apiModule;
-      OPFSCoopSyncVFS = vfsModule.OPFSCoopSyncVFS;
-      if (!SQLiteESMFactory || !SQLite || !OPFSCoopSyncVFS) {
+      OPFSAnyContextVFS = vfsModule.OPFSAnyContextVFS;
+      if (!SQLiteESMFactory || !SQLite || !OPFSAnyContextVFS) {
         throw new Error('wa-sqlite module exports are incomplete.');
       }
     });
@@ -38,7 +38,7 @@ self.addEventListener('unhandledrejection', (event) => {
   } catch (_) {}
 });
 
-const VFS_NAME = 'usse-opfs-any-vfs';
+const VFS_NAME = 'usse-opfs-read-vfs';
 const DB_FILE_PREFIX = 'USSE_PRN_';
 
 function dbFileForVersion(version) {
@@ -53,9 +53,6 @@ let db = null;
 
 function ensureSupported() {
   if (!navigator.storage?.getDirectory) throw new Error('Origin Private File System (OPFS) is not available.');
-  if (typeof FileSystemFileHandle === 'undefined' || typeof FileSystemFileHandle.prototype.createSyncAccessHandle !== 'function') {
-    throw new Error('Synchronous OPFS file access is not available in this browser.');
-  }
   if (typeof DecompressionStream === 'undefined') throw new Error('Streaming gzip decompression is not available in this browser.');
 }
 
@@ -65,7 +62,7 @@ async function ensureSQLite() {
   await loadSQLiteModules();
   sqliteModule = await SQLiteESMFactory();
   sqlite3 = SQLite.Factory(sqliteModule);
-  vfs = await OPFSCoopSyncVFS.create(VFS_NAME, sqliteModule);
+  vfs = await OPFSAnyContextVFS.create(VFS_NAME, sqliteModule);
   sqlite3.vfs_register(vfs, true);
 }
 
@@ -94,67 +91,59 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
 
   const root = await opfsRoot();
   const handle = await root.getFileHandle(fileName, { create: true });
-  const access = await handle.createSyncAccessHandle();
-  let offset = 0;
+  let writable = null;
   let closed = false;
-  const close = () => {
-    if (closed) return;
-    closed = true;
-    try { access.flush(); } catch (_) {}
-    try { access.close(); } catch (_) {}
-  };
-
   try {
-    access.truncate(0);
+    // One-time import uses the normal OPFS writable stream. The SQLite reader
+    // uses OPFSAnyContextVFS and never needs an exclusive sync access handle.
+    writable = await handle.createWritable({ keepExistingData: false });
+
     const total = Number(response.headers.get('Content-Length')) || 0;
     const reader = response.body.getReader();
-    const first = await reader.read();
-    if (first.done || !first.value?.byteLength) throw new Error('Database download returned an empty response.');
+    let received = 0;
 
-    let firstPending = true;
     const monitored = new ReadableStream({
-      start(controller) { this.received = 0; },
       async pull(controller) {
-        let next;
-        if (firstPending) {
-          firstPending = false;
-          next = first;
-        } else {
-          next = await reader.read();
+        const next = await reader.read();
+        if (next.done) {
+          controller.close();
+          return;
         }
-        if (next.done) { controller.close(); return; }
         const chunk = next.value;
-        if (!chunk || !chunk.byteLength) return;
-        this.received += chunk.byteLength;
-        self.postMessage({ type: 'progress', stage: 'download', received: this.received, total });
+        if (!chunk?.byteLength) return;
+        received += chunk.byteLength;
+        self.postMessage({ type: 'progress', stage: 'download', received, total });
         controller.enqueue(chunk);
       },
       cancel(reason) { reader.cancel(reason).catch(() => {}); }
     });
 
-    const firstBytes = first.value;
-    const looksGzip = firstBytes[0] === 0x1f && firstBytes[1] === 0x8b;
-    let source = monitored;
-    if (looksGzip) source = monitored.pipeThrough(new DecompressionStream('gzip'));
-
-    await source.pipeTo(new WritableStream({
-      write(chunk) {
-        access.write(chunk, { at: offset });
-        offset += chunk.byteLength;
+    const source = monitored.pipeThrough(new DecompressionStream('gzip'));
+    let written = 0;
+    const progress = new TransformStream({
+      transform(chunk, controller) {
+        written += chunk.byteLength;
         if (expectedRawBytes) {
-          self.postMessage({ type: 'progress', stage: 'decompress', written: offset, totalRaw: Number(expectedRawBytes) });
+          self.postMessage({
+            type: 'progress',
+            stage: 'decompress',
+            written,
+            totalRaw: Number(expectedRawBytes)
+          });
         }
-      },
-      close,
-      abort: close
-    }));
+        controller.enqueue(chunk);
+      }
+    });
+
+    await source.pipeThrough(progress).pipeTo(writable);
+    await writable.close();
+    closed = true;
   } catch (error) {
-    close();
+    try { if (writable && !closed) await writable.abort(error); } catch (_) {}
     await removeFile(fileName);
     throw error;
   }
 
-  close();
   const actual = await fileSize(fileName);
   if (!actual || (expectedRawBytes && actual !== Number(expectedRawBytes))) {
     await removeFile(fileName);
@@ -166,28 +155,18 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
   }
 }
 
-async function prepareExistingDatabaseForCoopVFS(fileName) {
-  const root = await opfsRoot();
-  // wa-sqlite documents that an imported existing file can be opened reliably
-  // when the related journal/WAL files already exist. Create them as empty
-  // files before sqlite3_open_v2() runs.
-  await root.getFileHandle(fileName + '-journal', { create: true });
-  await root.getFileHandle(fileName + '-wal', { create: true });
-}
 
 async function openDatabase(fileName) {
   await ensureSQLite();
   if (!(await hasValidDatabase(fileName))) throw new Error(`SQLite database file is missing or invalid: ${fileName}`);
   if (db) { try { await sqlite3.close(db); } catch (_) {} db = null; }
-  await prepareExistingDatabaseForCoopVFS(fileName);
-  const flags = SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE;
   try {
-    db = await sqlite3.open_v2(fileName, flags, VFS_NAME);
+    db = await sqlite3.open_v2(fileName, SQLite.SQLITE_OPEN_READONLY, VFS_NAME);
   } catch (error) {
     const vfsMessage = vfs?.lastError?.message ? `; VFS: ${vfs.lastError.message}` : '';
     throw new Error(`sqlite3_open_v2${vfsMessage}`);
   }
-  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA locking_mode = NORMAL; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
+  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
 }
 
 async function cleanupOldDatabaseFiles(keepFileName) {
@@ -331,7 +310,6 @@ self.onmessage = async event => {
       await importCompressedDatabase(payload.url, fileName, payload.expectedBytes);
       self.postMessage({ id: 0, type: 'progress', stage: 'opening' });
       await openDatabase(fileName);
-      await cleanupOldDatabaseFiles(fileName);
       self.postMessage({ id, ok: true, type, result: { found: true, fileName, size: await fileSize(fileName) } });
       return;
     }
@@ -343,6 +321,12 @@ self.onmessage = async event => {
     }
     if (type === 'searchPIM') {
       self.postMessage({ id, ok: true, type, result: await searchPIM(payload) });
+      return;
+    }
+    if (type === 'close') {
+      if (db) { try { await sqlite3.close(db); } catch (_) {} db = null; }
+      self.postMessage({ id, ok: true, type });
+      self.close();
       return;
     }
     throw new Error('Unknown worker request: ' + type);
