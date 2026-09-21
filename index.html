@@ -1008,7 +1008,7 @@
                 try { appState.worker.terminate(); } catch (_) {}
                 appState.worker = null;
             }
-            const workerUrl = new URL('./sqlite-worker-v35.js?v=20260921-v35', document.baseURI);
+            const workerUrl = new URL('./sqlite-worker-v36.js?v=20260921-v36', document.baseURI);
             const worker = new Worker(workerUrl);
             worker.onmessage = event => {
                 const message = event.data || {};
@@ -1224,7 +1224,7 @@
             const activeMeta = await idbGet('activeDatabase').catch(() => null);
 
             if (activeMeta?.version === version) {
-                const result = await workerCall('openCached', { expectedBytes: rawBytes });
+                const result = await workerCall('openCached', { expectedBytes: rawBytes, version });
                 if (result.found) {
                     setLoading(70, 'Opening local SQLite…', 'Using the database already stored on this device.');
                     appState.activeDBVersion = version;
@@ -1276,7 +1276,7 @@
                 if (cachedVersion) {
                     appState.dictionary = cachedDict?.data || null;
                     try {
-                        await workerCall('openCached', { expectedBytes: 0 });
+                        await workerCall('openCached', { expectedBytes: 0, version: cachedVersion });
                         setDBStatus('offline', `Offline · DB ${cachedVersion.slice(0, 12)}`);
                         setSourceStatus('db', 'ok', 'Local DB: cached');
                         setupAutocomplete();
