@@ -1,8 +1,8 @@
 const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
-const WORKER_BUILD = '20260921-v39';
+const WORKER_BUILD = '20260921-stable-shortname';
 let SQLiteESMFactory = null;
 let SQLite = null;
-let OPFSAnyContextVFS = null;
+let OPFSCoopSyncVFS = null;
 let sqliteImportsPromise = null;
 
 async function loadSQLiteModules() {
@@ -10,12 +10,12 @@ async function loadSQLiteModules() {
     sqliteImportsPromise = Promise.all([
       import(`${WA_SQLITE_BASE}/dist/wa-sqlite.mjs`),
       import(`${WA_SQLITE_BASE}/src/sqlite-api.js`),
-      import(`${WA_SQLITE_BASE}/src/examples/OPFSAnyContextVFS.js`)
+      import(`${WA_SQLITE_BASE}/src/examples/OPFSCoopSyncVFS.js`)
     ]).then(([factoryModule, apiModule, vfsModule]) => {
       SQLiteESMFactory = factoryModule.default;
       SQLite = apiModule;
-      OPFSAnyContextVFS = vfsModule.OPFSAnyContextVFS;
-      if (!SQLiteESMFactory || !SQLite || !OPFSAnyContextVFS) {
+      OPFSCoopSyncVFS = vfsModule.OPFSCoopSyncVFS;
+      if (!SQLiteESMFactory || !SQLite || !OPFSCoopSyncVFS) {
         throw new Error('wa-sqlite module exports are incomplete.');
       }
     });
@@ -38,11 +38,11 @@ self.addEventListener('unhandledrejection', (event) => {
   } catch (_) {}
 });
 
-const VFS_NAME = 'usse-opfs-read-vfs';
+const VFS_NAME = 'usse-opfs-any-vfs';
 const DB_FILE_PREFIX = 'USSE_PRN_';
 
 function dbFileForVersion(version) {
-  const clean = String(version || '').trim().replace(/[^a-fA-F0-9]/g, '').slice(0, 64);
+  const clean = String(version || '').trim().replace(/[^a-fA-F0-9]/g, '').slice(0, 24);
   if (!clean) throw new Error('Database version is missing.');
   return `${DB_FILE_PREFIX}${clean}.db`;
 }
@@ -53,7 +53,10 @@ let db = null;
 
 function ensureSupported() {
   if (!navigator.storage?.getDirectory) throw new Error('Origin Private File System (OPFS) is not available.');
-    if (typeof DecompressionStream === 'undefined') throw new Error('Streaming gzip decompression is not available in this browser.');
+  if (typeof FileSystemFileHandle === 'undefined' || typeof FileSystemFileHandle.prototype.createSyncAccessHandle !== 'function') {
+    throw new Error('Synchronous OPFS file access is not available in this browser.');
+  }
+  if (typeof DecompressionStream === 'undefined') throw new Error('Streaming gzip decompression is not available in this browser.');
 }
 
 async function ensureSQLite() {
@@ -62,7 +65,7 @@ async function ensureSQLite() {
   await loadSQLiteModules();
   sqliteModule = await SQLiteESMFactory();
   sqlite3 = SQLite.Factory(sqliteModule);
-  vfs = await OPFSAnyContextVFS.create(VFS_NAME, sqliteModule);
+  vfs = await OPFSCoopSyncVFS.create(VFS_NAME, sqliteModule);
   sqlite3.vfs_register(vfs, true);
 }
 
@@ -91,21 +94,26 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
 
   const root = await opfsRoot();
   const handle = await root.getFileHandle(fileName, { create: true });
-  let writable = null;
+  const access = await handle.createSyncAccessHandle();
+  let offset = 0;
   let closed = false;
-  try {
-    // Use the normal OPFS writable stream for the one-time import. This avoids
-    // createSyncAccessHandle() entirely, so another tab cannot block the import.
-    writable = await handle.createWritable({ keepExistingData: false });
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    try { access.flush(); } catch (_) {}
+    try { access.close(); } catch (_) {}
+  };
 
+  try {
+    access.truncate(0);
     const total = Number(response.headers.get('Content-Length')) || 0;
     const reader = response.body.getReader();
     const first = await reader.read();
     if (first.done || !first.value?.byteLength) throw new Error('Database download returned an empty response.');
 
     let firstPending = true;
-    let received = 0;
     const monitored = new ReadableStream({
+      start(controller) { this.received = 0; },
       async pull(controller) {
         let next;
         if (firstPending) {
@@ -114,14 +122,11 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
         } else {
           next = await reader.read();
         }
-        if (next.done) {
-          controller.close();
-          return;
-        }
+        if (next.done) { controller.close(); return; }
         const chunk = next.value;
-        if (!chunk?.byteLength) return;
-        received += chunk.byteLength;
-        self.postMessage({ type: 'progress', stage: 'download', received, total });
+        if (!chunk || !chunk.byteLength) return;
+        this.received += chunk.byteLength;
+        self.postMessage({ type: 'progress', stage: 'download', received: this.received, total });
         controller.enqueue(chunk);
       },
       cancel(reason) { reader.cancel(reason).catch(() => {}); }
@@ -129,35 +134,27 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
 
     const firstBytes = first.value;
     const looksGzip = firstBytes[0] === 0x1f && firstBytes[1] === 0x8b;
-    const source = looksGzip
-      ? monitored.pipeThrough(new DecompressionStream('gzip'))
-      : monitored;
+    let source = monitored;
+    if (looksGzip) source = monitored.pipeThrough(new DecompressionStream('gzip'));
 
-    let written = 0;
-    const progress = new TransformStream({
-      transform(chunk, controller) {
-        written += chunk.byteLength;
+    await source.pipeTo(new WritableStream({
+      write(chunk) {
+        access.write(chunk, { at: offset });
+        offset += chunk.byteLength;
         if (expectedRawBytes) {
-          self.postMessage({
-            type: 'progress',
-            stage: 'decompress',
-            written,
-            totalRaw: Number(expectedRawBytes)
-          });
+          self.postMessage({ type: 'progress', stage: 'decompress', written: offset, totalRaw: Number(expectedRawBytes) });
         }
-        controller.enqueue(chunk);
-      }
-    });
-
-    await source.pipeThrough(progress).pipeTo(writable);
-    await writable.close();
-    closed = true;
+      },
+      close,
+      abort: close
+    }));
   } catch (error) {
-    try { if (writable && !closed) await writable.abort(error); } catch (_) {}
+    close();
     await removeFile(fileName);
     throw error;
   }
 
+  close();
   const actual = await fileSize(fileName);
   if (!actual || (expectedRawBytes && actual !== Number(expectedRawBytes))) {
     await removeFile(fileName);
@@ -169,14 +166,28 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
   }
 }
 
+async function prepareExistingDatabaseForCoopVFS(fileName) {
+  const root = await opfsRoot();
+  // wa-sqlite documents that an imported existing file can be opened reliably
+  // when the related journal/WAL files already exist. Create them as empty
+  // files before sqlite3_open_v2() runs.
+  await root.getFileHandle(fileName + '-journal', { create: true });
+  await root.getFileHandle(fileName + '-wal', { create: true });
+}
+
 async function openDatabase(fileName) {
   await ensureSQLite();
   if (!(await hasValidDatabase(fileName))) throw new Error(`SQLite database file is missing or invalid: ${fileName}`);
   if (db) { try { await sqlite3.close(db); } catch (_) {} db = null; }
-  // The database is installed as an ordinary OPFS file and opened read-only.
-  // OPFSAnyContextVFS is explicitly intended for read-only / nearly read-only DBs.
-  db = await sqlite3.open_v2(fileName, SQLite.SQLITE_OPEN_READONLY, VFS_NAME);
-  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
+  await prepareExistingDatabaseForCoopVFS(fileName);
+  const flags = SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE;
+  try {
+    db = await sqlite3.open_v2(fileName, flags, VFS_NAME);
+  } catch (error) {
+    const vfsMessage = vfs?.lastError?.message ? `; VFS: ${vfs.lastError.message}` : '';
+    throw new Error(`sqlite3_open_v2${vfsMessage}`);
+  }
+  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA locking_mode = NORMAL; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
 }
 
 async function cleanupOldDatabaseFiles(keepFileName) {
