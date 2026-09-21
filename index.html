@@ -1008,7 +1008,7 @@
                 try { appState.worker.terminate(); } catch (_) {}
                 appState.worker = null;
             }
-            const workerUrl = new URL('./sqlite-worker-v36.js?v=20260921-v36', document.baseURI);
+            const workerUrl = new URL(`./sqlite-worker.js?cb=${Date.now()}`, document.baseURI);
             const worker = new Worker(workerUrl);
             worker.onmessage = event => {
                 const message = event.data || {};
