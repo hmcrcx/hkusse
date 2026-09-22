@@ -163,8 +163,14 @@ async function openDatabase(fileName) {
   try {
     db = await sqlite3.open_v2(fileName, SQLite.SQLITE_OPEN_READONLY, VFS_NAME);
   } catch (error) {
-    const vfsMessage = vfs?.lastError?.message ? `; VFS: ${vfs.lastError.message}` : '';
-    throw new Error(`sqlite3_open_v2${vfsMessage}`);
+    // Preserve the original exception. Previously this catch replaced the real
+    // OPFS/SQLite error with a generic message, which hid the actual stack.
+    try {
+      error.vfsError = vfs?.lastError?.message || '';
+      error.databaseFile = fileName;
+      error.vfsName = VFS_NAME;
+    } catch (_) {}
+    throw error;
   }
   await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
 }
@@ -331,14 +337,16 @@ self.onmessage = async event => {
     }
     throw new Error('Unknown worker request: ' + type);
   } catch (error) {
-  self.postMessage({
-    id,
-    ok: false,
-    type,
-    error: error?.message || String(error),
-    errorName: error?.name || '',
-    errorStack: error?.stack || '',
-    vfsError: vfs?.lastError?.message || ''
-  });
-}
+    self.postMessage({
+      id,
+      ok: false,
+      type,
+      error: error?.message || String(error),
+      errorName: error?.name || '',
+      errorStack: error?.stack || '',
+      vfsError: error?.vfsError || vfs?.lastError?.message || '',
+      databaseFile: error?.databaseFile || '',
+      vfsName: error?.vfsName || VFS_NAME
+    });
+  }
 };
