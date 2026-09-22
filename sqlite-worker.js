@@ -331,6 +331,14 @@ self.onmessage = async event => {
     }
     throw new Error('Unknown worker request: ' + type);
   } catch (error) {
-    self.postMessage({ id, ok: false, type, error: error?.message || String(error) });
-  }
+  self.postMessage({
+    id,
+    ok: false,
+    type,
+    error: error?.message || String(error),
+    errorName: error?.name || '',
+    errorStack: error?.stack || '',
+    vfsError: vfs?.lastError?.message || ''
+  });
+}
 };

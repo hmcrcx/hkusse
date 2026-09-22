@@ -1046,7 +1046,17 @@
                 if (!pending) return;
                 appState.workerRequests.delete(message.id);
                 if (message.ok) pending.resolve(message);
-                else pending.reject(new Error(message.error || 'SQLite worker error'));
+                else {
+                    const detail = [
+                        message.error || 'SQLite worker error',
+                        message.errorName ? `name=${message.errorName}` : '',
+                        message.vfsError ? `vfs=${message.vfsError}` : '',
+                        message.errorStack ? `\n${message.errorStack}` : ''
+                    ].filter(Boolean).join('\n');
+
+                    console.error('SQLite worker detailed error:', message);
+                    pending.reject(new Error(detail));
+                }
             };
             worker.onerror = event => {
                 const detail = [event?.message, event?.filename, event?.lineno && `line ${event.lineno}`, event?.colno && `col ${event.colno}`].filter(Boolean).join(' | ');
