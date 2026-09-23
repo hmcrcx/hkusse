@@ -1,5 +1,5 @@
 const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
-const WORKER_BUILD = '20260923-writable-close-fix';
+const WORKER_BUILD = '20260923-open-fix';
 let SQLiteESMFactory = null;
 let SQLite = null;
 let OPFSAnyContextVFS = null;
@@ -174,7 +174,7 @@ async function openDatabase(fileName) {
     } catch (_) {}
     throw error;
   }
-  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
+  // No post-open PRAGMA calls: the database is already opened read-only.
 }
 
 async function cleanupOldDatabaseFiles(keepFileName) {
