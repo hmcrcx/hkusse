@@ -172,7 +172,11 @@ async function openDatabase(fileName) {
     } catch (_) {}
     throw error;
   }
-  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
+  // The connection is already SQLITE_OPEN_READONLY, so these PRAGMAs are not
+  // required for correctness. In particular, avoid a post-open sqlite3.exec()
+  // here because some OPFS/VFS/browser combinations can surface CANTOPEN while
+  // preparing PRAGMA statements even though the database itself opened.
+
 }
 
 async function cleanupOldDatabaseFiles(keepFileName) {
