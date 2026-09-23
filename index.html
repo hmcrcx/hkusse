@@ -1003,6 +1003,7 @@
         /* ================================================================
            SQLITE WORKER (OPFS / wa-sqlite)
            ================================================================ */
+        // CACHE_FIX_BUILD = 20260923-opfs-source-of-truth
         function createWorker() {
             if (appState.worker) {
                 try { appState.worker.terminate(); } catch (_) {}
@@ -1233,18 +1234,12 @@
             if (!version) throw new Error('Database manifest is missing database.sha256.');
             const rawBytes = Number(manifest.database.rawBytes || 0);
             const compressedBytes = Number(manifest.database.compressedBytes || 0);
-            // OPFS is the authoritative local database cache. IndexedDB stores
-            // only small metadata, so never require the metadata marker before
-            // checking whether the versioned OPFS database already exists.
-            // This also repairs missing/stale IndexedDB metadata automatically.
-            let cachedOpen = null;
-            try {
-                cachedOpen = await workerCall('openCached', { expectedBytes: rawBytes, version });
-            } catch (error) {
-                console.warn('Cached OPFS database could not be opened; falling back to download.', error);
-            }
 
-            if (cachedOpen?.found) {
+            // OPFS is the source of truth for the large SQLite file. Do not gate
+            // reuse on an IndexedDB metadata flag; the marker can be missing or
+            // stale even though the 566 MiB OPFS database is still present.
+            const cached = await workerCall('openCached', { expectedBytes: rawBytes, version });
+            if (cached.found) {
                 setLoading(70, 'Opening local SQLite…', 'Using the database already stored on this device.');
                 appState.activeDBVersion = version;
                 await idbPut({ id: 'activeDatabase', version }).catch(() => {});
