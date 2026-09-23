@@ -1233,15 +1233,22 @@
             if (!version) throw new Error('Database manifest is missing database.sha256.');
             const rawBytes = Number(manifest.database.rawBytes || 0);
             const compressedBytes = Number(manifest.database.compressedBytes || 0);
-            const activeMeta = await idbGet('activeDatabase').catch(() => null);
+            // OPFS is the authoritative local database cache. IndexedDB stores
+            // only small metadata, so never require the metadata marker before
+            // checking whether the versioned OPFS database already exists.
+            // This also repairs missing/stale IndexedDB metadata automatically.
+            let cachedOpen = null;
+            try {
+                cachedOpen = await workerCall('openCached', { expectedBytes: rawBytes, version });
+            } catch (error) {
+                console.warn('Cached OPFS database could not be opened; falling back to download.', error);
+            }
 
-            if (activeMeta?.version === version) {
-                const result = await workerCall('openCached', { expectedBytes: rawBytes, version });
-                if (result.found) {
-                    setLoading(70, 'Opening local SQLite…', 'Using the database already stored on this device.');
-                    appState.activeDBVersion = version;
-                    return;
-                }
+            if (cachedOpen?.found) {
+                setLoading(70, 'Opening local SQLite…', 'Using the database already stored on this device.');
+                appState.activeDBVersion = version;
+                await idbPut({ id: 'activeDatabase', version }).catch(() => {});
+                return;
             }
 
             const url = absoluteR2Url(manifest.database.file) + `?v=${encodeURIComponent(version)}`;
