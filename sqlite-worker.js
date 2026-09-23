@@ -135,8 +135,10 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
       }
     });
 
+    // pipeTo() closes the destination writable stream by default. Do not call
+    // writable.close() a second time; browsers correctly reject that as a
+    // close on an already-closed FileSystemWritableFileStream.
     await source.pipeThrough(progress).pipeTo(writable);
-    await writable.close();
     closed = true;
   } catch (error) {
     try { if (writable && !closed) await writable.abort(error); } catch (_) {}
@@ -172,11 +174,7 @@ async function openDatabase(fileName) {
     } catch (_) {}
     throw error;
   }
-  // The connection is already SQLITE_OPEN_READONLY, so these PRAGMAs are not
-  // required for correctness. In particular, avoid a post-open sqlite3.exec()
-  // here because some OPFS/VFS/browser combinations can surface CANTOPEN while
-  // preparing PRAGMA statements even though the database itself opened.
-
+  await sqlite3.exec(db, 'PRAGMA query_only = ON; PRAGMA cache_size = -8192; PRAGMA temp_store = MEMORY;');
 }
 
 async function cleanupOldDatabaseFiles(keepFileName) {
