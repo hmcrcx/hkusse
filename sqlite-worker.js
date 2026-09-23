@@ -1,5 +1,5 @@
 const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
-const WORKER_BUILD = '20260921-anycontext-refresh-fix';
+const WORKER_BUILD = '20260923-writable-close-fix';
 let SQLiteESMFactory = null;
 let SQLite = null;
 let OPFSAnyContextVFS = null;
