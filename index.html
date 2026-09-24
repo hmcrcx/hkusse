@@ -1239,12 +1239,17 @@
             // reuse on an IndexedDB metadata flag; the marker can be missing or
             // stale even though the 566 MiB OPFS database is still present.
             const cached = await workerCall('openCached', { expectedBytes: rawBytes, version });
-            if (cached.found) {
+            if (cached.result?.found) {
                 setLoading(70, 'Opening local SQLite…', 'Using the database already stored on this device.');
                 appState.activeDBVersion = version;
                 await idbPut({ id: 'activeDatabase', version }).catch(() => {});
                 return;
             }
+
+            console.info('OPFS database cache miss; installing database.', {
+                requestedVersion: version,
+                workerResult: cached.result || null
+            });
 
             const url = absoluteR2Url(manifest.database.file) + `?v=${encodeURIComponent(version)}`;
             setLoading(20, 'Downloading database…', `Preparing the ${compressedBytes ? (compressedBytes / 1024 / 1024).toFixed(1) : '?'} MiB compressed database for device storage.`);
