@@ -1,5 +1,5 @@
 const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
-const WORKER_BUILD = '20260923-final-open-fix-2';
+const WORKER_BUILD = '20260924-opfs-query-fix-1';
 let SQLiteESMFactory = null;
 let SQLite = null;
 let OPFSAnyContextVFS = null;
@@ -83,6 +83,16 @@ async function hasValidDatabase(name, expectedBytes = null) {
   } catch (_) { return false; }
 }
 
+async function removeEmptyDatabaseSidecars(fileName) {
+  // This database is immutable and was built in journal_mode=delete. Empty
+  // -wal/-journal files can be leftovers from an interrupted/older VFS open.
+  // Remove only zero-byte sidecars; never delete a non-empty journal/WAL.
+  for (const suffix of ['-wal', '-journal']) {
+    const sidecar = fileName + suffix;
+    if (await fileSize(sidecar) === 0) await removeFile(sidecar);
+  }
+}
+
 async function importCompressedDatabase(url, fileName, expectedRawBytes) {
   ensureSupported();
   const response = await fetch(url, { cache: 'no-store' });
@@ -135,9 +145,6 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
       }
     });
 
-    // pipeTo() closes the destination writable stream by default. Do not call
-    // writable.close() a second time; browsers correctly reject that as a
-    // close on an already-closed FileSystemWritableFileStream.
     await source.pipeThrough(progress).pipeTo(writable);
     closed = true;
   } catch (error) {
@@ -155,6 +162,7 @@ async function importCompressedDatabase(url, fileName, expectedRawBytes) {
     await removeFile(fileName);
     throw new Error('Database installation failed SQLite header validation.');
   }
+  await removeEmptyDatabaseSidecars(fileName);
 }
 
 
@@ -162,11 +170,14 @@ async function openDatabase(fileName) {
   await ensureSQLite();
   if (!(await hasValidDatabase(fileName))) throw new Error(`SQLite database file is missing or invalid: ${fileName}`);
   if (db) { try { await sqlite3.close(db); } catch (_) {} db = null; }
+
+  // The shipped database is a read-only, journal_mode=delete snapshot. Clear
+  // only empty stale sidecars left by older VFS attempts before opening it.
+  await removeEmptyDatabaseSidecars(fileName);
+
   try {
     db = await sqlite3.open_v2(fileName, SQLite.SQLITE_OPEN_READONLY, VFS_NAME);
   } catch (error) {
-    // Preserve the original exception. Previously this catch replaced the real
-    // OPFS/SQLite error with a generic message, which hid the actual stack.
     try {
       error.vfsError = vfs?.lastError?.message || '';
       error.databaseFile = fileName;
@@ -174,7 +185,6 @@ async function openDatabase(fileName) {
     } catch (_) {}
     throw error;
   }
-  // No post-open PRAGMA calls: the database is already opened read-only.
 }
 
 async function cleanupOldDatabaseFiles(keepFileName) {
@@ -183,6 +193,9 @@ async function cleanupOldDatabaseFiles(keepFileName) {
     for await (const [name, handle] of root.entries()) {
       if (handle.kind === 'file' && name.startsWith(DB_FILE_PREFIX) && name.endsWith('.db') && name !== keepFileName) {
         try { await root.removeEntry(name); } catch (_) {}
+        for (const suffix of ['-wal', '-journal']) {
+          try { await root.removeEntry(name + suffix); } catch (_) {}
+        }
       }
     }
   } catch (_) {}
@@ -315,6 +328,7 @@ self.onmessage = async event => {
       // acquire an exclusive write handle on a file another tab/worker may
       // currently have open for read-only SQLite queries.
       await removeFile(fileName);
+      await removeEmptyDatabaseSidecars(fileName);
       await importCompressedDatabase(payload.url, fileName, payload.expectedBytes);
       self.postMessage({ id: 0, type: 'progress', stage: 'opening' });
       await openDatabase(fileName);
