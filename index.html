@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
     <title>Universal Spatial Search Engine</title>
     
     <!-- SQLite -->
@@ -566,124 +567,397 @@
         if (status) status.textContent = text;
     }
 
-    const request = indexedDB.open("PRN_App_Storage", 1);
-    request.onupgradeneeded = function(e) { if (!e.target.result.objectStoreNames.contains("files")) e.target.result.createObjectStore("files", { keyPath: "id" }); };
-    request.onsuccess = async function(e) {
-        localStore = e.target.result;
-        updateLoadingProgress(10, "Loading SQLite Engine...");
-        SQL = await initSqlJs({ locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` });
-        checkNetworkVersion();
-    };
+    const DB_STORAGE_NAME = "PRN_App_Storage";
+    const DB_STORAGE_VERSION = 1;
+    const DB_STORE_NAME = "files";
+    const DB_CACHE_ID = "masterDB";
+    const DB_MANIFEST_URL = "database-manifest.json";
+    const AUTOCOMPLETE_URL = "autocomplete_dict.json";
+    const DB_R2_URL = "https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev/PRN_Data.db.gz";
 
-    function checkNetworkVersion() {
-        updateLoadingProgress(20, "Checking for database updates...");
-        
-        // Load the tiny dictionary file for autocomplete
-        const dictScript = document.createElement('script');
-        dictScript.src = 'autocomplete_dict.js?v=' + new Date().getTime();
-        document.head.appendChild(dictScript);
+    let currentManifest = null;
+    let dbInitStarted = false;
+    let autocompleteInitialized = false;
+    let pimEnterInitialized = false;
 
-        const script = document.createElement('script');
-        script.src = 'database_version.js?v=' + new Date().getTime();
-        script.onload = () => {
-            const latestVersion = window.dbPayloadVersion;
-            const cachedVersion = localStorage.getItem('cachedDbVersion');
-            if (latestVersion && latestVersion === cachedVersion) loadFromIndexedDB();
-            else downloadAndCachePayload(latestVersion);
-        };
-        script.onerror = () => {
-            updateLoadingProgress(30, "Network unavailable. Checking local cache...");
-            loadFromIndexedDB();
-        };
-        document.head.appendChild(script);
-    }
+    function openLocalDatabase() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_STORAGE_NAME, DB_STORAGE_VERSION);
 
-    function loadFromIndexedDB() {
-        updateLoadingProgress(40, "Reading database from local cache...");
-        const tx = localStore.transaction(["files"], "readonly");
-        const getReq = tx.objectStore("files").get("masterDB");
-        getReq.onsuccess = function(e) {
-            if (e.target.result && e.target.result.data) {
-                updateLoadingProgress(70, "Unpacking local database...");
-                const cachedVersion = localStorage.getItem('cachedDbVersion') || 'Unknown';
-                setTimeout(() => loadDatabaseIntoMemory(e.target.result.data, cachedVersion), 50);
-            }
-            else downloadAndCachePayload("fallback_trigger");
-        };
-    }
-
-    async function downloadAndCachePayload(newVersionStr) {
-        updateLoadingProgress(30, "Downloading database from Cloudflare...");
-        try {
-            // REPLACE THIS URL WITH YOUR ACTUAL R2.DEV BUCKET URL + FILENAME
-            const dbUrl = 'https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev/PRN_Data.db.gz';
-
-            const response = await fetch(dbUrl);
-            if (!response.ok) throw new Error("Network error: " + response.statusText);
-            
-            updateLoadingProgress(60, "Decompressing database...");
-            const rawBuffer = await response.arrayBuffer();
-            
-            let finalBinary;
-            try {
-                // Decompress the stream
-                const ds = new DecompressionStream('gzip');
-                const stream = new Response(rawBuffer).body.pipeThrough(ds);
-                finalBinary = new Uint8Array(await new Response(stream).arrayBuffer());
-            } catch (e) {
-                // Fallback just in case the browser auto-decompressed it
-                finalBinary = new Uint8Array(rawBuffer); 
-            }
-            
-            updateLoadingProgress(85, "Caching database to local storage...");
-            const tx = localStore.transaction(["files"], "readwrite");
-            tx.objectStore("files").put({ id: "masterDB", data: finalBinary });
-            tx.oncomplete = () => {
-                localStorage.setItem('cachedDbVersion', newVersionStr);
-                setTimeout(() => loadDatabaseIntoMemory(finalBinary, newVersionStr), 50);
+            req.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(DB_STORE_NAME)) {
+                    db.createObjectStore(DB_STORE_NAME, { keyPath: "id" });
+                }
             };
-        } catch(err) {
-            console.error("Download Error Details:", err);
-            updateLoadingProgress(0, "Error downloading database. Check console.");
+
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error("IndexedDB could not be opened."));
+            req.onblocked = () => reject(new Error("IndexedDB is blocked by another tab or browser process."));
+        });
+    }
+
+    async function fetchDatabaseManifest() {
+        try {
+            const response = await fetch(DB_MANIFEST_URL, {
+                cache: "no-store",
+                headers: { "Accept": "application/json" }
+            });
+            if (!response.ok) throw new Error(`Manifest HTTP ${response.status}`);
+            const manifest = await response.json();
+
+            if (!manifest || !manifest.database || !manifest.database.file) {
+                throw new Error("database-manifest.json is missing required database metadata.");
+            }
+
+            return manifest;
+        } catch (err) {
+            console.warn("Database manifest unavailable; continuing with cache/R2 fallback.", err);
+            return null;
         }
     }
 
-    function loadDatabaseIntoMemory(uInt8Array, dbVersion) {
-        updateLoadingProgress(85, "Initializing Spatial Engine...");
-        
-        setTimeout(() => {
-            activeDB = new SQL.Database(uInt8Array);
-            
-            // Extract the YYYYMMDD part and format to YYYY-MM-DD
-            let formattedVersion = dbVersion;
-            if (dbVersion && dbVersion !== 'fallback_trigger') {
-                let match = dbVersion.match(/^(\d{4})(\d{2})(\d{2})/);
-                if (match) { formattedVersion = `${match[1]}-${match[2]}-${match[3]}`; }
-            }
-            let versionDisplay = (formattedVersion && formattedVersion !== 'fallback_trigger') ? ` [DB ver.: ${formattedVersion}]` : '';
-            
-            updateLoadingProgress(100, `System Ready!${versionDisplay}`);
-            document.getElementById('dbStatus').className = "status success";
-            
-            // Enable controls
-            document.getElementById('unifiedSearchInput').disabled = false;
-            document.getElementById('unifiedSearchBtn').disabled = false;
-            document.querySelectorAll('.pim-input').forEach(el => el.disabled = false);
-            document.getElementById('pimSearchBtn').disabled = false;
-            
-            setupAutocomplete();
-            setupEnterToSearchPIM();
+    async function fetchAutocompleteDictionary(manifest) {
+        try {
+            let dictUrl = AUTOCOMPLETE_URL;
+            const dictHash = manifest?.autocomplete?.sha256;
+            if (dictHash) dictUrl += `?v=${encodeURIComponent(dictHash)}`;
 
-            // Smoothly fade out and remove the loading screen
-            setTimeout(() => {
-                const overlay = document.getElementById('loadingOverlay');
-                overlay.style.opacity = '0';
-                setTimeout(() => overlay.style.display = 'none', 500);
-            }, 400); 
-            
-        }, 50);
+            const response = await fetch(dictUrl, {
+                cache: "force-cache",
+                headers: { "Accept": "application/json" }
+            });
+            if (!response.ok) throw new Error(`Autocomplete dictionary HTTP ${response.status}`);
+
+            const dictionary = await response.json();
+            if (!dictionary || typeof dictionary !== "object") {
+                throw new Error("Autocomplete dictionary is not a JSON object.");
+            }
+
+            window.pimDictionary = dictionary;
+            return true;
+        } catch (err) {
+            console.warn("Autocomplete dictionary unavailable.", err);
+            window.pimDictionary = null;
+            return false;
+        }
     }
 
+    function readCachedDatabase() {
+        return new Promise((resolve, reject) => {
+            if (!localStore) {
+                resolve(null);
+                return;
+            }
+
+            let tx;
+            try {
+                tx = localStore.transaction([DB_STORE_NAME], "readonly");
+            } catch (err) {
+                reject(err);
+                return;
+            }
+
+            const req = tx.objectStore(DB_STORE_NAME).get(DB_CACHE_ID);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error || new Error("Unable to read the local database cache."));
+        });
+    }
+
+    function deleteCachedDatabase() {
+        return new Promise((resolve) => {
+            if (!localStore) {
+                resolve();
+                return;
+            }
+
+            try {
+                const tx = localStore.transaction([DB_STORE_NAME], "readwrite");
+                tx.objectStore(DB_STORE_NAME).delete(DB_CACHE_ID);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+                tx.onabort = () => resolve();
+            } catch (err) {
+                resolve();
+            }
+        });
+    }
+
+    function saveCachedDatabase(binary, cacheVersion) {
+        return new Promise((resolve, reject) => {
+            if (!localStore) {
+                resolve(false);
+                return;
+            }
+
+            let tx;
+            try {
+                tx = localStore.transaction([DB_STORE_NAME], "readwrite");
+                tx.objectStore(DB_STORE_NAME).put({
+                    id: DB_CACHE_ID,
+                    data: binary.buffer,
+                    version: cacheVersion || null,
+                    rawBytes: binary.byteLength,
+                    cachedAtUtc: new Date().toISOString()
+                });
+
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => reject(tx.error || new Error("Local database cache write failed."));
+                tx.onabort = () => reject(tx.error || new Error("Local database cache write was aborted."));
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    function getExpectedRawBytes(manifest) {
+        const value = Number(manifest?.database?.rawBytes);
+        return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    function getManifestVersion(manifest) {
+        return manifest?.database?.sha256 || null;
+    }
+
+    function isCacheUsable(cached, manifest) {
+        if (!cached || !cached.data) return false;
+
+        const expectedBytes = getExpectedRawBytes(manifest);
+        const cachedBytes = Number(cached.rawBytes || (cached.data.byteLength ?? cached.data.length) || 0);
+
+        if (manifest) {
+            const expectedVersion = getManifestVersion(manifest);
+            if (expectedVersion && cached.version && cached.version !== expectedVersion) return false;
+
+            if (expectedVersion && !cached.version) {
+                // Compatibility with the original IndexedDB cache format:
+                // database_version.js stored a YYYYMMDD_* value only in localStorage.
+                const legacyVersion = localStorage.getItem("cachedDbVersion") || "";
+                const manifestDate = String(manifest?.builtAtUtc || "").slice(0, 10).replace(/-/g, "");
+                const legacyMatchesBuildDate = /^\d{8}_/.test(legacyVersion) && manifestDate && legacyVersion.startsWith(manifestDate);
+                if (!(expectedBytes && cachedBytes === expectedBytes && legacyMatchesBuildDate)) return false;
+            }
+
+            if (expectedBytes && cachedBytes !== expectedBytes) return false;
+        }
+
+        return cachedBytes > 0;
+    }
+
+    function normalizeBinary(data) {
+        if (data instanceof Uint8Array) return data;
+        if (data instanceof ArrayBuffer) return new Uint8Array(data);
+        if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        throw new Error("Cached database payload is not a valid binary buffer.");
+    }
+
+    async function decodeDatabasePayload(response, manifest) {
+        const payload = new Uint8Array(await response.arrayBuffer());
+        if (!payload.length) throw new Error("Cloudflare returned an empty database payload.");
+
+        const isGzip = payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b;
+
+        // The manifest SHA is for the uploaded .gz object. Verify it on each
+        // actual network download so a wrong/stale R2 object is never cached.
+        const expectedCompressedSha = manifest?.database?.sha256;
+        if (isGzip && expectedCompressedSha && window.crypto?.subtle) {
+            const digest = await crypto.subtle.digest("SHA-256", payload);
+            const actualCompressedSha = Array.from(new Uint8Array(digest))
+                .map(b => b.toString(16).padStart(2, "0"))
+                .join("");
+            if (actualCompressedSha.toLowerCase() !== String(expectedCompressedSha).toLowerCase()) {
+                throw new Error(`Database SHA-256 mismatch: expected ${expectedCompressedSha}, received ${actualCompressedSha}.`);
+            }
+        }
+
+        let binary;
+        if (isGzip) {
+            if (typeof DecompressionStream === "undefined") {
+                throw new Error("This browser does not support gzip decompression required for the database.");
+            }
+
+            try {
+                const ds = new DecompressionStream("gzip");
+                const stream = new Response(payload).body.pipeThrough(ds);
+                binary = new Uint8Array(await new Response(stream).arrayBuffer());
+            } catch (err) {
+                throw new Error(`Database gzip decompression failed: ${err.message || err}`);
+            }
+        } else {
+            binary = payload;
+        }
+
+        const expectedBytes = getExpectedRawBytes(manifest);
+        if (expectedBytes && binary.byteLength !== expectedBytes) {
+            throw new Error(`Database size mismatch: expected ${expectedBytes.toLocaleString()} bytes, received ${binary.byteLength.toLocaleString()} bytes.`);
+        }
+
+        return binary;
+    }
+
+    async function downloadAndCachePayload(manifest) {
+        updateLoadingProgress(30, "Downloading database from Cloudflare...");
+
+        const response = await fetch(DB_R2_URL, {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error(`Database download failed with HTTP ${response.status}.`);
+        }
+
+        updateLoadingProgress(60, "Decompressing database...");
+        const finalBinary = await decodeDatabasePayload(response, manifest);
+
+        const cacheVersion = getManifestVersion(manifest) || `r2:${DB_R2_URL}`;
+        updateLoadingProgress(85, "Caching database to local storage...");
+
+        let cacheSaved = false;
+        try {
+            cacheSaved = await saveCachedDatabase(finalBinary, cacheVersion);
+        } catch (cacheErr) {
+            console.warn("Database cache write failed; continuing in memory.", cacheErr);
+        }
+
+        return { binary: finalBinary, fromCache: false, cacheSaved, version: cacheVersion };
+    }
+
+    async function loadDatabaseFromCacheOrNetwork(manifest) {
+        let cached = null;
+
+        try {
+            cached = await readCachedDatabase();
+        } catch (cacheErr) {
+            console.warn("Local cache read failed; attempting network.", cacheErr);
+        }
+
+        if (isCacheUsable(cached, manifest)) {
+            try {
+                updateLoadingProgress(50, "Loading database from local cache...");
+                const cachedVersion = cached.version || getManifestVersion(manifest) || "";
+                if (!cached.version && manifest && cachedVersion) {
+                    localStorage.setItem("cachedDbVersion", cachedVersion);
+                }
+                return { binary: normalizeBinary(cached.data), fromCache: true, cacheSaved: true, version: cachedVersion };
+            } catch (cacheErr) {
+                console.warn("Cached database payload is unusable; rebuilding cache.", cacheErr);
+                await deleteCachedDatabase();
+            }
+        }
+
+        return await downloadAndCachePayload(manifest);
+    }
+
+    function loadDatabaseIntoMemory(uInt8Array, dbVersion, cacheInfo) {
+        updateLoadingProgress(90, "Initializing Spatial Engine...");
+
+        setTimeout(() => {
+            try {
+                activeDB = new SQL.Database(uInt8Array);
+
+                let formattedVersion = currentManifest?.builtAtUtc || "";
+                if (formattedVersion) {
+                    const dateMatch = String(formattedVersion).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (dateMatch) formattedVersion = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+                } else if (dbVersion && dbVersion !== "fallback_trigger") {
+                    const match = String(dbVersion).match(/^(\d{4})(\d{2})(\d{2})/);
+                    if (match) formattedVersion = `${match[1]}-${match[2]}-${match[3]}`;
+                    else formattedVersion = "";
+                }
+
+                let versionDisplay = (formattedVersion && formattedVersion !== "fallback_trigger")
+                    ? ` [DB ver.: ${formattedVersion}]`
+                    : "";
+
+                updateLoadingProgress(100, `System Ready!${versionDisplay}`);
+                document.getElementById("dbStatus").className = "status success";
+
+                document.getElementById("unifiedSearchInput").disabled = false;
+                document.getElementById("unifiedSearchBtn").disabled = false;
+                document.querySelectorAll(".pim-input").forEach(el => el.disabled = false);
+                document.getElementById("pimSearchBtn").disabled = false;
+
+                if (!autocompleteInitialized && window.pimDictionary) {
+                    setupAutocomplete();
+                    autocompleteInitialized = true;
+                }
+                if (!pimEnterInitialized) {
+                    setupEnterToSearchPIM();
+                    pimEnterInitialized = true;
+                }
+
+                const cacheNote = cacheInfo && cacheInfo.fromCache ? " (cached)" : "";
+                if (cacheInfo && cacheInfo.cacheSaved === false) {
+                    document.getElementById("dbStatus").textContent = `System Ready!${versionDisplay} — session cache unavailable`;
+                } else {
+                    document.getElementById("dbStatus").textContent = `System Ready!${versionDisplay}${cacheNote}`;
+                }
+
+                setTimeout(() => {
+                    const overlay = document.getElementById("loadingOverlay");
+                    overlay.style.opacity = "0";
+                    setTimeout(() => overlay.style.display = "none", 500);
+                }, 300);
+
+            } catch (err) {
+                console.error("SQLite initialization failed:", err);
+                activeDB = null;
+                showInitializationError(`SQLite could not open the database: ${err.message || err}`);
+            }
+        }, 0);
+    }
+
+    function showInitializationError(message) {
+        console.error(message);
+        updateLoadingProgress(0, message);
+        const status = document.getElementById("dbStatus");
+        if (status) {
+            status.className = "status";
+            status.textContent = "Database initialization failed";
+            status.title = message;
+        }
+    }
+
+    async function initializeApplication() {
+        if (dbInitStarted) return;
+        dbInitStarted = true;
+
+        try {
+            updateLoadingProgress(10, "Loading SQLite Engine...");
+
+            const manifestPromise = fetchDatabaseManifest();
+            const sqlPromise = initSqlJs({
+                locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
+            });
+
+            const manifest = await manifestPromise;
+            currentManifest = manifest;
+
+            const dictPromise = fetchAutocompleteDictionary(manifest);
+            SQL = await sqlPromise;
+
+            const [dbResult] = await Promise.all([
+                loadDatabaseFromCacheOrNetwork(manifest),
+                dictPromise
+            ]);
+
+            const cacheVersion = getManifestVersion(manifest) || dbResult.version || "";
+            loadDatabaseIntoMemory(dbResult.binary, cacheVersion, dbResult);
+        } catch (err) {
+            showInitializationError(`Startup failed: ${err.message || err}`);
+        }
+    }
+
+    openLocalDatabase()
+        .then(db => {
+            localStore = db;
+            initializeApplication();
+        })
+        .catch(async err => {
+            console.warn("IndexedDB is unavailable; running without persistent cache.", err);
+            localStore = null;
+            initializeApplication();
+        });
 
     // ==========================================
     // PIM: FUZZY AUTOCOMPLETE (FUSE.JS)
@@ -724,14 +998,22 @@
 
         const results = fuseInstance.search(val, { limit: 8 });
 
-        let html = '';
+        listEl.innerHTML = '';
         results.forEach(res => {
-            let safeStr = res.item.replace(/'/g, "\\'");
-            html += `<div onclick="selectSuggestion('${inputId}', '${listId}', '${safeStr}', '${nextInputId}')">${res.item}</div>`;
+            const option = document.createElement('div');
+            option.textContent = res.item;
+            option.addEventListener('click', () => {
+                selectSuggestion(inputId, listId, res.item, nextInputId);
+            });
+            listEl.appendChild(option);
         });
 
-        if (html) { listEl.innerHTML = html; listEl.style.display = 'block'; listEl.currentFocus = -1; } 
-        else { listEl.style.display = 'none'; }
+        if (results.length > 0) {
+            listEl.style.display = 'block';
+            listEl.currentFocus = -1;
+        } else {
+            listEl.style.display = 'none';
+        }
     }
 
     function selectSuggestion(inputId, listId, value, nextInputId) {
@@ -876,21 +1158,39 @@
                     warningBanner.style.display = "block";
                 }
 
+
                 for (let i = 0; i < displayCount; i++) {
                     const row = results[i];
                     const tr = document.createElement('tr');
-                    const prnId = 'pim-prn-' + i; 
-                    
-                    tr.innerHTML = `
-                        <td style="display: flex; align-items: center;">
-                            <a class="prn-link" id="${prnId}" onclick="launchUsseSearch('${row.PRN}')">${row.PRN}</a> 
-                            <button class="pim-icon-copy-btn" onclick="copyText('${prnId}', this)" title="Copy PRN">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                            </button>
-                        </td>
-                        <td>${row.FREE_FORMAT_ADDR_ENG || "N/A"}</td>
-                        <td>${row.FREE_FORMAT_ADDR_CHN || "N/A"}</td>
-                    `;
+
+                    const prnCell = document.createElement('td');
+                    prnCell.style.display = 'flex';
+                    prnCell.style.alignItems = 'center';
+
+                    const prnLink = document.createElement('a');
+                    prnLink.className = 'prn-link';
+                    prnLink.textContent = row.PRN || '';
+                    prnLink.id = 'pim-prn-' + i;
+                    prnLink.addEventListener('click', () => launchUsseSearch(row.PRN));
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'pim-icon-copy-btn';
+                    copyBtn.title = 'Copy PRN';
+                    copyBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+                    copyBtn.addEventListener('click', () => copyText(prnLink.id, copyBtn));
+
+                    prnCell.appendChild(prnLink);
+                    prnCell.appendChild(copyBtn);
+
+                    const engCell = document.createElement('td');
+                    engCell.textContent = row.FREE_FORMAT_ADDR_ENG || 'N/A';
+
+                    const chiCell = document.createElement('td');
+                    chiCell.textContent = row.FREE_FORMAT_ADDR_CHN || 'N/A';
+
+                    tr.appendChild(prnCell);
+                    tr.appendChild(engCell);
+                    tr.appendChild(chiCell);
                     tbody.appendChild(tr);
                 }
 
