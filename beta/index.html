@@ -413,6 +413,14 @@
 </head>
 <body>
 
+<!-- Centralized SVG Copy Icon to drastically reduce DOM size -->
+<svg style="display: none;">
+    <symbol id="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </symbol>
+</svg>
+
 <div id="loadingOverlay">
     <div class="loading-card">
         <div class="loading-title">Universal Spatial Search Engine</div>
@@ -514,15 +522,15 @@
                 <details class="accordion" open>
                     <summary>Address Data <span class="arrow">▼</span></summary>
                     <div class="results-grid" id="addressGrid">
-                        <div class="full-width"><div class="result-tile primary-result-tile"><label>Land Registry Address</label><div class="result-value" id="lrAddressText">--</div><button class="icon-copy-btn" onclick="copyText('lrAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div class="full-width"><div class="result-tile"><label>English Address (ALS)</label><div class="result-value" id="engAddressText">--</div><button class="icon-copy-btn" onclick="copyText('engAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div class="full-width"><div class="result-tile"><label>Chinese Address (ALS)</label><div class="result-value" id="chiAddressText">--</div><button class="icon-copy-btn" onclick="copyText('chiAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>Building Name (Eng)</label><div class="result-value" id="bldgEngText">--</div><button class="icon-copy-btn" onclick="copyText('bldgEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>Building Name (Chi)</label><div class="result-value" id="bldgChiText">--</div><button class="icon-copy-btn" onclick="copyText('bldgChiText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>Estate Name (Eng)</label><div class="result-value" id="estateEngText">--</div><button class="icon-copy-btn" onclick="copyText('estateEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>Estate Name (Chi)</label><div class="result-value" id="estateChiText">--</div><button class="icon-copy-btn" onclick="copyText('estateChiText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>District (Eng)</label><div class="result-value" id="distEngText">--</div><button class="icon-copy-btn" onclick="copyText('distEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>District (Chi)</label><div class="result-value" id="distChiText">--</div><button class="icon-copy-btn" onclick="copyText('distChiText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile primary-result-tile"><label>Land Registry Address</label><div class="result-value" id="lrAddressText">--</div><button class="icon-copy-btn" onclick="copyText('lrAddressText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile"><label>English Address (ALS)</label><div class="result-value" id="engAddressText">--</div><button class="icon-copy-btn" onclick="copyText('engAddressText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile"><label>Chinese Address (ALS)</label><div class="result-value" id="chiAddressText">--</div><button class="icon-copy-btn" onclick="copyText('chiAddressText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>Building Name (Eng)</label><div class="result-value" id="bldgEngText">--</div><button class="icon-copy-btn" onclick="copyText('bldgEngText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>Building Name (Chi)</label><div class="result-value" id="bldgChiText">--</div><button class="icon-copy-btn" onclick="copyText('bldgChiText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>Estate Name (Eng)</label><div class="result-value" id="estateEngText">--</div><button class="icon-copy-btn" onclick="copyText('estateEngText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>Estate Name (Chi)</label><div class="result-value" id="estateChiText">--</div><button class="icon-copy-btn" onclick="copyText('estateChiText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>District (Eng)</label><div class="result-value" id="distEngText">--</div><button class="icon-copy-btn" onclick="copyText('distEngText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>District (Chi)</label><div class="result-value" id="distChiText">--</div><button class="icon-copy-btn" onclick="copyText('distChiText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
                         <div id="dynamicStreetsGrid" class="full-width" style="display: contents;"></div>
                     </div>
                 </details>
@@ -535,20 +543,20 @@
                     <div class="domain-block private-bd" id="bdDomainBlock">
                         <div class="domain-title"><span>Private Building (Buildings Dept)</span><span class="domain-badge badge-bd">BD / BO</span></div>
                         <div class="grid-3-col">
-                            <div class="result-tile"><label>OP No.</label><div class="result-value" id="opNoText">--</div><button class="icon-copy-btn" onclick="copyText('opNoText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                            <div class="result-tile"><label>OP Date</label><div class="result-value" id="opDateText">--</div><button class="icon-copy-btn" onclick="copyText('opDateText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                            <div class="result-tile"><label>Age</label><div class="result-value" id="ageText">--</div><button class="icon-copy-btn" onclick="copyText('ageText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>OP No.</label><div class="result-value" id="opNoText">--</div><button class="icon-copy-btn" onclick="copyText('opNoText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                            <div class="result-tile"><label>OP Date</label><div class="result-value" id="opDateText">--</div><button class="icon-copy-btn" onclick="copyText('opDateText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                            <div class="result-tile"><label>Age</label><div class="result-value" id="ageText">--</div><button class="icon-copy-btn" onclick="copyText('ageText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
                         </div>
-                        <div class="result-tile" style="margin-top: 12px;"><label>Permitted Use</label><div class="result-value" id="permittedUseText">--</div><button class="icon-copy-btn" onclick="copyText('permittedUseText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                        <div class="result-tile" style="margin-top: 12px;"><label>Permitted Use</label><div class="result-value" id="permittedUseText">--</div><button class="icon-copy-btn" onclick="copyText('permittedUseText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
                     </div>
 
                     <div class="domain-block subsidized-ha" id="haDomainBlock">
                         <div class="domain-title"><span>Subsidized Housing (Housing Authority)</span><span class="domain-badge badge-ha">HA Record</span></div>
                         <div class="results-grid">
-                            <div class="result-tile"><label>Housing Type / HOS Phase No.</label><div class="result-value" id="subHousingTypeText">--</div><button class="icon-copy-btn" onclick="copyText('subHousingTypeText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                            <div class="result-tile"><label>Block Type</label><div class="result-value" id="blockTypeText">--</div><button class="icon-copy-btn" onclick="copyText('blockTypeText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                            <div class="result-tile"><label>Intake Year</label><div class="result-value" id="yearCompText">--</div><button class="icon-copy-btn" onclick="copyText('yearCompText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                            <div class="result-tile"><label>Age (HA)</label><div class="result-value" id="haAgeText">--</div><button class="icon-copy-btn" onclick="copyText('haAgeText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>Housing Type / HOS Phase No.</label><div class="result-value" id="subHousingTypeText">--</div><button class="icon-copy-btn" onclick="copyText('subHousingTypeText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                            <div class="result-tile"><label>Block Type</label><div class="result-value" id="blockTypeText">--</div><button class="icon-copy-btn" onclick="copyText('blockTypeText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                            <div class="result-tile"><label>Intake Year</label><div class="result-value" id="yearCompText">--</div><button class="icon-copy-btn" onclick="copyText('yearCompText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                            <div class="result-tile"><label>Age (HA)</label><div class="result-value" id="haAgeText">--</div><button class="icon-copy-btn" onclick="copyText('haAgeText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
                         </div>
                     </div>
                 </details>
@@ -557,11 +565,11 @@
                 <details class="accordion" open>
                     <summary>CSDI Information <span class="arrow">▼</span></summary>
                     <div class="results-grid">
-                        <div><div class="result-tile"><label>BuildingCSUID (GeoAddress Code)</label><div class="result-value" id="csuidText">--</div><button class="icon-copy-btn" onclick="copyText('csuidText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>BuildingStructureID (Block ID)</label><div class="result-value" id="structureIdText">--</div><button class="icon-copy-btn" onclick="copyText('structureIdText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div class="full-width"><div class="result-tile"><label>Lot Number (Only for PRN-search)</label><div class="result-value" id="lotNumText">--</div><button class="icon-copy-btn" onclick="copyText('lotNumText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>Easting (HK1980 Grid)</label><div class="result-value" id="eastingText">--</div><button class="icon-copy-btn" onclick="copyText('eastingText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
-                        <div><div class="result-tile"><label>Northing (HK1980 Grid)</label><div class="result-value" id="northingText">--</div><button class="icon-copy-btn" onclick="copyText('northingText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>BuildingCSUID (GeoAddress Code)</label><div class="result-value" id="csuidText">--</div><button class="icon-copy-btn" onclick="copyText('csuidText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>BuildingStructureID (Block ID)</label><div class="result-value" id="structureIdText">--</div><button class="icon-copy-btn" onclick="copyText('structureIdText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile"><label>Lot Number (Only for PRN-search)</label><div class="result-value" id="lotNumText">--</div><button class="icon-copy-btn" onclick="copyText('lotNumText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>Easting (HK1980 Grid)</label><div class="result-value" id="eastingText">--</div><button class="icon-copy-btn" onclick="copyText('eastingText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
+                        <div><div class="result-tile"><label>Northing (HK1980 Grid)</label><div class="result-value" id="northingText">--</div><button class="icon-copy-btn" onclick="copyText('northingText', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div></div>
                     </div>
                 </details>
             </div>
@@ -728,6 +736,32 @@
     }
 
     // ==========================================
+    // TOAST NOTIFICATION SYSTEM
+    // ==========================================
+    function showToast(message) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.style.cssText = 'position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; flex-direction: column; gap: 10px; pointer-events: none;';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.style.cssText = 'background: var(--primary-dark); color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 13px; font-weight: 700; opacity: 0; transition: opacity 0.3s ease; text-align: center;';
+        toast.textContent = message;
+        container.appendChild(toast);
+        
+        // Trigger reflow to start animation
+        void toast.offsetWidth;
+        toast.style.opacity = '1';
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // ==========================================
     // DATABASE INITIALIZATION & LOADING ENGINE
     // ==========================================
     function updateLoadingProgress(percent, text) {
@@ -746,8 +780,6 @@
     const AUTOCOMPLETE_URL = "autocomplete_dict.json";
     const DB_R2_URL = "https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev/PRN_Data.db.gz";
 
-    // iPhone/iPad beta backend: streamed SQLite import into OPFS, queried by a Worker.
-    // This avoids materializing the ~736 MB SQLite file in the Safari UI/WASM heap.
     const MOBILE_BETA_META_KEY = "usseMobileBetaDbVersion";
     const MOBILE_BETA_WORKER_URL = "sqlite-mobile-worker.js";
     let mobileSQLiteWorker = null;
@@ -768,11 +800,6 @@
     }
     let mobileSQLiteRequestId = 0;
     const mobileSQLitePending = new Map();
-
-    function isAppleTouchDevice() {
-        const ua = navigator.userAgent || "";
-        return /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    }
 
     function databaseIsReady() {
         return mobileSQLiteReady || !!activeDB;
@@ -830,7 +857,7 @@
     }
 
     async function initializeMobileSQLite(manifest) {
-        updateLoadingProgress(20, "Starting mobile SQLite engine...");
+        updateLoadingProgress(20, "Starting OPFS SQLite engine...");
         await setupMobileSQLiteWorker();
 
         const version = manifest?.database?.sha256 || "";
@@ -855,8 +882,8 @@
         const versionText = result?.version ? ` [DB ver.: ${String(result.version).slice(0, 8)}]` : "";
         document.getElementById("dbStatus").className = "status success";
         document.getElementById("dbStatus").textContent = fromCache
-            ? `⚡ Ready · iPhone local database${versionText}${records}`
-            : `⚡ Ready · iPhone database cached${versionText}${records}`;
+            ? `⚡ Ready · OPFS local database${versionText}${records}`
+            : `⚡ Ready · OPFS database cached${versionText}${records}`;
 
         updateLoadingProgress(100, "System Ready!");
         return result;
@@ -892,9 +919,6 @@
 
     function openLocalDatabase() {
         return new Promise((resolve, reject) => {
-            // Do not pass a hard-coded version here. Older USSE builds may have
-            // already created PRN_App_Storage at a higher version (for example v3).
-            // Asking IndexedDB to open that database at v1 throws VersionError.
             const req = indexedDB.open(DB_STORAGE_NAME);
 
             req.onupgradeneeded = function(e) {
@@ -905,9 +929,6 @@
                 const db = req.result;
                 db.onversionchange = () => db.close();
 
-                // A legacy database at a higher version may not have the cache
-                // store. Upgrade it by exactly one version rather than attempting
-                // to downgrade it.
                 if (db.objectStoreNames.contains(DB_STORE_NAME)) {
                     resolve(db);
                     return;
@@ -1053,9 +1074,6 @@
     }
 
     function getManifestVersion(manifest) {
-        // database.sha256 is the SHA-256 of the uploaded R2 .db.gz asset.
-        // Use the asset hash as the cache identity; rawSha256 is optional for
-        // manifests that also publish the decompressed SQLite hash.
         return manifest?.database?.sha256 || null;
     }
 
@@ -1070,8 +1088,6 @@
             if (expectedVersion && cached.version && cached.version !== expectedVersion) return false;
 
             if (expectedVersion && !cached.version) {
-                // Do not trust an unversioned legacy cache against a new manifest.
-                // A same-day rebuild can have identical size but different contents.
                 return false;
             }
 
@@ -1094,10 +1110,6 @@
 
         const isGzip = payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b;
 
-        // database.sha256 is the SHA-256 of the uploaded .db.gz object. Verify it
-        // when fetch() exposes the gzip bytes. If R2/browser transparently decodes
-        // the transport, the response body is already SQLite and the compressed hash
-        // is not available from that response.
         const expectedCompressedSha = manifest?.database?.sha256;
         const expectedCompressedBytes = Number(manifest?.database?.compressedBytes);
         if (isGzip) {
@@ -1137,8 +1149,6 @@
             throw new Error(`Database size mismatch: expected ${expectedBytes.toLocaleString()} bytes, received ${binary.byteLength.toLocaleString()} bytes.`);
         }
 
-        // Optional future-proof integrity check for the final SQLite bytes.
-        // Current manifest v2 publishes database.sha256 for the .db.gz asset.
         const expectedRawSha = manifest?.database?.rawSha256;
         if (expectedRawSha && window.crypto?.subtle) {
             const digest = await crypto.subtle.digest("SHA-256", binary);
@@ -1294,8 +1304,8 @@
 
             const dictPromise = fetchAutocompleteDictionary(manifest);
 
-            if (isAppleTouchDevice()) {
-                // IMPORTANT: do not instantiate sql.js / load the 736 MB database into memory on iPhone/iPad.
+            // Attempt to load the highly efficient OPFS worker for ALL devices
+            try {
                 await Promise.all([dictPromise, initializeMobileSQLite(manifest)]);
                 document.getElementById("unifiedSearchInput").disabled = false;
                 document.getElementById("unifiedSearchBtn").disabled = false;
@@ -1314,9 +1324,13 @@
                     overlay.style.opacity = "0";
                     setTimeout(() => overlay.style.display = "none", 500);
                 }, 300);
-                return;
+                return; // OPFS worker loaded successfully
+            } catch (workerErr) {
+                console.warn("OPFS worker unavailable or failed. Falling back to in-memory SQLite:", workerErr);
+                mobileSQLiteReady = false; 
             }
 
+            // Fallback to legacy standard sql.js initialization for unsupported browsers
             updateLoadingProgress(10, "Loading SQLite Engine...");
             await loadDesktopSqlJs();
             SQL = await initSqlJs({
@@ -1485,6 +1499,7 @@
 
     function executePIMSearch() {
         if (!databaseIsReady()) return;
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); // Dismiss Keyboard
 
         const district = document.getElementById('inpDistrict').value.trim().toUpperCase();
         const dev = document.getElementById('inpDev').value.trim().toUpperCase();
@@ -1496,7 +1511,7 @@
         const flat = document.getElementById('inpFlat').value.trim().toUpperCase();
 
         if (!dev && !street && !freeFormat) {
-            alert("Please enter at least a Building/Estate Name, Street Name, or Free Format Search to anchor the search.");
+            showToast("Please enter at least a Building/Estate Name, Street Name, or Free Format Search to anchor the search.");
             return;
         }
 
@@ -1560,7 +1575,6 @@
                     warningBanner.style.display = "block";
                 }
 
-
                 for (let i = 0; i < displayCount; i++) {
                     const row = results[i];
                     const tr = document.createElement('tr');
@@ -1578,7 +1592,7 @@
                     const copyBtn = document.createElement('button');
                     copyBtn.className = 'pim-icon-copy-btn';
                     copyBtn.title = 'Copy PRN';
-                    copyBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+                    copyBtn.innerHTML = '<svg width="15" height="15"><use href="#icon-copy"></use></svg>';
                     copyBtn.addEventListener('click', () => copyText(prnLink.id, copyBtn));
 
                     prnCell.appendChild(prnLink);
@@ -1599,7 +1613,7 @@
                 if (results.length === 0) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color: #64748b; padding: 20px;">No matching PRNs found for this combination. Try broadening your search or check your spelling.</td></tr>`;
                 document.getElementById('pimResultsCard').style.display = 'block';
 
-            } catch (err) { alert("An error occurred while searching the database."); } 
+            } catch (err) { showToast("An error occurred while searching the database."); } 
             finally { btn.disabled = false; spinner.style.display = 'none'; btnText.textContent = 'Identify PRN'; }
         }, 10);
     }
@@ -1622,15 +1636,16 @@
         const btn = document.getElementById('mapLangBtn');
         if (currentMapLang === 'en') {
             miniMap.removeLayer(labelLayerEng); miniMap.addLayer(labelLayerChi);
-            currentMapLang = 'tc'; btn.innerHTML = '🔠 EN / 中';
+            currentMapLang = 'tc'; btn.innerHTML = '<span class="map-action-icon">🔠</span><span class="map-action-label"> EN / 中</span>';
         } else {
             miniMap.removeLayer(labelLayerChi); miniMap.addLayer(labelLayerEng);
-            currentMapLang = 'en'; btn.innerHTML = '🈯 中 / EN';
+            currentMapLang = 'en'; btn.innerHTML = '<span class="map-action-icon">🈯</span><span class="map-action-label"> 中 / EN</span>';
         }
     }
 
     function recenterMap() { if (miniMap && currentLat && currentLng) miniMap.setView([currentLat, currentLng], 18); }
     function openGoogleMaps() { if (currentLat && currentLng) window.open(`https://www.google.com/maps/search/?api=1&query=${currentLat},${currentLng}`, '_blank'); }
+    
     async function copyCoords() {
         if (!(currentLat && currentLng)) return;
         const value = `${currentLat}, ${currentLng}`;
@@ -1643,8 +1658,9 @@
                 label.textContent = ' Copied';
                 setTimeout(() => { label.textContent = original; }, 1400);
             }
+            showToast("Coordinates copied to clipboard");
         } catch (e) {
-            alert(`Coordinates: ${value}`);
+            showToast(`Coordinates: ${value}`);
         }
     }
 
@@ -1745,6 +1761,7 @@
     }
 
     function executeUnifiedSearch() {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); // Dismiss Keyboard
         const rawInput = document.getElementById('unifiedSearchInput').value.trim();
         if (!rawInput || !databaseIsReady()) return;
         
@@ -1875,9 +1892,9 @@
             let n = i + 1;
             html += `<div class="full-width" style="margin-top:10px;"><div class="domain-title" style="margin-bottom:4px;">Street ${n}</div>
             <div class="grid-3-col">
-                <div class="result-tile"><label>Street Name (Eng)</label><div class="result-value" id="stNameEng_${n}">${s.engName}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNameEng_${n}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                <div class="result-tile"><label>Street Name (Chi)</label><div class="result-value" id="stNameChi_${n}">${s.chiName}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNameChi_${n}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
-                <div class="result-tile"><label>Street No.</label><div class="result-value" id="stNo_${n}">${s.engNo}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNo_${n}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                <div class="result-tile"><label>Street Name (Eng)</label><div class="result-value" id="stNameEng_${n}">${s.engName}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNameEng_${n}', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                <div class="result-tile"><label>Street Name (Chi)</label><div class="result-value" id="stNameChi_${n}">${s.chiName}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNameChi_${n}', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
+                <div class="result-tile"><label>Street No.</label><div class="result-value" id="stNo_${n}">${s.engNo}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNo_${n}', this)"><svg width="15" height="15"><use href="#icon-copy"></use></svg></button></div>
             </div></div>`;
         });
         document.getElementById('dynamicStreetsGrid').innerHTML = html;
@@ -2124,7 +2141,7 @@
                 for (let s of streetsData) {
                     if (s.isPrimary) continue;
                     try {
-                        const secResp = await fetch(`https://www.als.gov.hk/lookup?q=${encodeURIComponent(`${s.engNo} ${s.engName}`)}`, { headers: { "Accept": "application/json", "Accept-Language": "en,zh-Hant" }});
+                        const secResp = await fetch(`https://www.als.gov.hk/lookup?q=${encodeURIComponent(`${s.engNo}${s.engName}`)}`, { headers: { "Accept": "application/json", "Accept-Language": "en,zh-Hant" }});
                         const secJson = await secResp.json();
                         s.chiName = secJson.SuggestedAddress ? secJson.SuggestedAddress[0].Address.PremisesAddress.ChiPremisesAddress?.ChiStreet?.StreetName || "--" : "--";
                     } catch(e) { s.chiName = "--"; }
