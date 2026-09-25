@@ -144,6 +144,134 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ----- UX ENHANCEMENTS ----- */
+        .app-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .app-logo { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+        .header-copy { min-width: 0; }
+        .header-subtitle { margin-top: 2px; color: var(--text-muted); font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .db-status-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .db-status-caption { color: var(--text-muted); font-size: 10px; font-weight: 700; }
+
+        .search-top-bar { gap: 12px; }
+        .search-mode-label { display: none; font-size: 11px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+        .tab-btn { white-space: nowrap; }
+        .search-input-group { align-items: stretch; }
+        .search-input-shell { position: relative; flex: 1; min-width: 0; }
+        .search-input-shell input { padding-right: 74px; }
+        .search-input-hint { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--text-muted); border: 1px solid var(--border-color); background: #fff; border-radius: 5px; padding: 3px 5px; font-weight: 800; pointer-events: none; }
+        .search-helper { margin-top: 8px; display: flex; justify-content: space-between; gap: 10px; color: var(--text-muted); font-size: 11px; font-weight: 600; }
+        .shortcut-hint { white-space: nowrap; }
+
+        .welcome-inner { max-width: 720px; padding: 30px 20px; }
+        .welcome-kicker { color: var(--accent-green); font-size: 11px; font-weight: 900; letter-spacing: .7px; text-transform: uppercase; margin-bottom: 8px; }
+        .example-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+        .example-chip { border: 1px solid var(--border-color); background: #fff; color: var(--text-main); border-radius: 999px; padding: 7px 11px; font-size: 11px; font-weight: 750; cursor: pointer; transition: all .18s ease; box-shadow: var(--shadow-sm); }
+        .example-chip:hover { border-color: var(--accent-green); color: var(--primary-dark); transform: translateY(-1px); }
+        .example-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; }
+
+        .result-summary { display: none; align-items: center; gap: 12px; background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+        .primary-result-tile { padding: 12px 14px; background: #f5fbf7; border-color: var(--accent-border); }
+        .primary-result-tile .result-value { font-size: 15px; font-weight: 850; padding-right: 34px; }
+        .primary-result-tile label { color: var(--primary-dark); }
+        .result-summary-icon { width: 34px; height: 34px; border-radius: 8px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+        .result-summary-title { font-size: 13px; font-weight: 900; color: var(--primary-dark); margin-bottom: 2px; }
+        .result-summary-text { color: var(--text-muted); font-size: 11px; font-weight: 650; word-break: break-word; }
+        .result-summary-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+        .summary-action { border: 1px solid var(--accent-border); background: #fff; color: var(--primary-dark); border-radius: 7px; padding: 6px 9px; font-size: 10px; font-weight: 800; cursor: pointer; }
+
+        .autocomplete-list { padding: 3px; }
+        .autocomplete-meta { padding: 7px 9px 5px; color: var(--text-muted); font-size: 10px; font-weight: 800; pointer-events: none; border-bottom: 1px solid #f1f5f9; text-transform: uppercase; letter-spacing: .35px; }
+        .autocomplete-option { padding: 9px 8px !important; border-radius: 5px; border-bottom: 0 !important; }
+        .autocomplete-match { font-weight: 900; color: var(--primary-dark); }
+        .autocomplete-active .autocomplete-match { color: #fff; }
+        .autocomplete-empty { padding: 10px 9px; color: var(--text-muted); font-size: 12px; font-weight: 650; pointer-events: none; }
+
+        .pim-primary-fields { border: 1px solid var(--accent-border); background: var(--accent-light); border-radius: 10px; padding: 12px; margin-bottom: 18px; }
+        .pim-primary-note { font-size: 10px; color: var(--text-muted); font-weight: 700; margin-bottom: 9px; }
+        .pim-results-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+        .pim-results-heading h3 { margin: 0; color: var(--primary-dark); }
+        .pim-results-subtitle { font-size: 11px; color: var(--text-muted); font-weight: 700; }
+        .pim-zero-help { margin-top: 8px; padding: 10px 12px; background: #fff; border: 1px dashed var(--border-color); border-radius: 8px; color: var(--text-muted); font-size: 11px; font-weight: 650; line-height: 1.5; }
+        .pim-zero-help strong { color: var(--primary-dark); }
+
+        .mobile-result-toggle { display: none; }
+        .mobile-result-btn { border: 0; background: transparent; color: var(--text-muted); padding: 7px 16px; border-radius: 15px; font-size: 11px; font-weight: 850; cursor: pointer; }
+        .mobile-result-btn.active { background: #fff; color: var(--primary-dark); box-shadow: var(--shadow-sm); }
+        .map-action-label { display: inline; }
+        .map-action-icon { display: inline; }
+        .icon-copy-btn { min-width: 30px; min-height: 30px; }
+
+        @media (max-width: 992px) {
+            .app-container { padding: 8px; }
+            .app-header { align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; }
+            .header-title-area { flex: 1; min-width: 0; }
+            .app-brand { gap: 8px; }
+            .app-logo { width: 30px; height: 30px; border-radius: 7px; }
+            .app-header h2 { font-size: 17px; letter-spacing: -.35px; }
+            .header-subtitle { display: none; }
+            .db-status-wrap { align-items: flex-end; max-width: 44%; }
+            .db-status-caption { display: none; }
+            #dbStatus { font-size: 10px; line-height: 1.2; text-align: right; }
+            .view-toggle { flex-shrink: 0; }
+            .view-btn { padding: 6px 10px; font-size: 11px; }
+
+            .search-card { padding: 11px; }
+            .search-top-bar { align-items: stretch; flex-direction: column; gap: 7px; margin-bottom: 8px; }
+            .search-mode-label { display: block; }
+            .segmented-control { overflow-x: auto; width: 100%; padding: 3px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+            .segmented-control::-webkit-scrollbar { display: none; }
+            .tab-btn { flex: 0 0 auto; padding: 7px 11px; font-size: 11px; }
+            #detectedTypeBadge { align-self: flex-start; font-size: 10px !important; }
+            .search-input-group { gap: 7px; }
+            .search-input-shell input { min-height: 44px; font-size: 15px; padding-right: 58px; }
+            .search-input-hint { display: none; }
+            .search-input-group .action-btn { min-width: 78px; padding: 9px 12px; }
+            .search-helper { flex-direction: column; gap: 2px; }
+            .shortcut-hint { display: none; }
+
+            #welcomeState { min-height: 260px; }
+            .welcome-inner { padding: 30px 12px; }
+            #welcomeState h3 { font-size: 19px; }
+
+            .mobile-result-toggle { display: inline-flex; align-self: flex-start; background: #e2e8f0; padding: 3px; border-radius: 18px; gap: 2px; margin-bottom: 10px; }
+            .dashboard-layout { flex-direction: column; gap: 12px; }
+            .dashboard-layout.mobile-data-view .map-column { display: none; }
+            .dashboard-layout.mobile-data-view .data-column { display: block; }
+            .dashboard-layout.mobile-map-view .data-column { display: none; }
+            .dashboard-layout.mobile-map-view .map-column { display: flex; height: calc(100vh - 205px); min-height: 360px; margin-bottom: 0; }
+            .data-column { padding-right: 0; }
+            .map-quick-actions { top: 8px; right: 8px; gap: 4px; padding: 3px; }
+            .map-action-btn { width: 36px; height: 36px; min-width: 36px; padding: 0; justify-content: center; font-size: 14px; }
+            .map-action-label { display: none; }
+            .map-action-icon { display: inline; }
+            #jumpToMapBtn { display: none !important; }
+
+            .result-tile .icon-copy-btn { display: none !important; opacity: .75; }
+            .result-tile .icon-copy-btn.active-copy { display: flex !important; }
+
+            .result-summary { padding: 10px 11px; }
+            .summary-action { min-height: 34px; }
+
+            .pim-card { padding: 16px 12px; }
+            .pim-primary-fields { padding: 10px; }
+            .pim-primary-note { margin-bottom: 7px; }
+            .row-2 { gap: 12px; }
+            .pim-btn { min-height: 44px; }
+            .pim-table th, .pim-table td { padding: 11px 12px; font-size: 13px; }
+        }
+
+        @media (max-width: 480px) {
+            .app-header h2 { font-size: 15px; }
+            .view-btn { padding: 6px 8px; font-size: 10px; }
+            .db-status-wrap { max-width: 38%; }
+            #dbStatus { font-size: 9px; }
+            .search-input-group .action-btn { min-width: 68px; padding-inline: 9px; }
+            .search-helper { font-size: 10px; }
+            .result-summary-actions { display: none; }
+            .example-chip { font-size: 10px; }
+            .map-action-btn { width: 34px; height: 34px; min-width: 34px; }
+        }
+
         /* ----- USSE STYLES ----- */
         #usseView { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
         .search-top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -299,14 +427,23 @@
 <div class="app-container">
     <div class="app-header">
         <div class="header-title-area">
-            <h2>Universal Spatial Search Engine</h2>
+            <div class="app-brand">
+                <img class="app-logo" src="favicon.png" alt="USSE">
+                <div class="header-copy">
+                    <h2>Universal Spatial Search Engine</h2>
+                    <div class="header-subtitle">Hong Kong property, address &amp; spatial lookup</div>
+                </div>
+            </div>
             <!-- View Toggle -->
             <div class="view-toggle">
                 <button class="view-btn active" id="btnViewUSSE" onclick="switchAppView('USSE')">Spatial Engine</button>
                 <button class="view-btn" id="btnViewPIM" onclick="switchAppView('PIM')">PRN Finder</button>
             </div>
         </div>
-        <div id="dbStatus" class="status">Connecting to Central Server...</div>
+        <div class="db-status-wrap">
+            <div id="dbStatus" class="status">Connecting to Database...</div>
+            <div class="db-status-caption">Local-first database</div>
+        </div>
     </div>
 
     <!-- ========================================== -->
@@ -315,6 +452,7 @@
     <div id="usseView">
         <div class="card search-card" id="searchContainer">
             <div class="search-top-bar">
+                <span class="search-mode-label">Search by</span>
                 <div class="segmented-control">
                     <button class="tab-btn active" id="tabAUTO" onclick="setManualMode('AUTO')">Auto-Detect</button>
                     <button class="tab-btn" id="tabPRN" onclick="setManualMode('PRN')">PRN</button>
@@ -326,26 +464,57 @@
             </div>
 
             <div class="search-input-group">
-                <input type="text" id="unifiedSearchInput" placeholder="Enter PRN, Address, BuildingCSUID, Structure ID, or OP No." disabled oninput="handleAutoDetect()">
+                <div class="search-input-shell">
+                    <input type="text" id="unifiedSearchInput" placeholder="Search PRN, address, BuildingCSUID, Block ID or OP No." disabled oninput="handleAutoDetect()" aria-label="Spatial search">
+                    <span class="search-input-hint">Enter</span>
+                </div>
                 <button class="action-btn" id="unifiedSearchBtn" disabled onclick="executeUnifiedSearch()">
                     <span class="spinner" id="searchSpinner"></span>
                     <span id="searchBtnText">Search</span>
                 </button>
             </div>
+            <div class="search-helper">
+                <span>Auto-Detect recognises PRN, GeoAddress Code, Block ID, OP No. and address text.</span>
+                <span class="shortcut-hint">Ctrl / Cmd + K&nbsp; · &nbsp;Enter to search</span>
+            </div>
         </div>
 
         <div id="welcomeState">
-            <h3>Welcome to the Dashboard</h3>
-            <p>Enter any identifier or address to instantly fetch cross-departmental spatial data.</p>
+            <div class="welcome-inner">
+                <div class="welcome-kicker">Lightning-fast local search</div>
+                <h3>Search Hong Kong property data</h3>
+                <p>Type any identifier or address. The engine will detect the input type automatically, or you can choose a search mode above.</p>
+                <div class="example-row">
+                    <span class="example-chip">Melody Garden</span>
+                    <span class="example-chip">Nathan Road</span>
+                    <span class="example-chip"><code>PRN&nbsp;A1234567</code></span>
+                    <span class="example-chip">BuildingCSUID</span>
+                </div>
+            </div>
         </div>
 
-        <div class="dashboard-layout" id="resultsContainer">
+        <div class="mobile-result-toggle" id="mobileResultToggle" aria-label="Result view">
+            <button class="mobile-result-btn active" id="mobileDataBtn" onclick="setMobileResultView('data')">Data</button>
+            <button class="mobile-result-btn" id="mobileMapBtn" onclick="setMobileResultView('map')">Map</button>
+        </div>
+
+        <div class="dashboard-layout mobile-data-view" id="resultsContainer">
             <div class="data-column">
+                <div class="result-summary" id="resultSummary">
+                    <div class="result-summary-icon">✓</div>
+                    <div>
+                        <div class="result-summary-title" id="resultSummaryTitle">Search results ready</div>
+                        <div class="result-summary-text" id="resultSummaryText">--</div>
+                    </div>
+                    <div class="result-summary-actions">
+                        <button class="summary-action" onclick="viewResultMap()">View map</button>
+                    </div>
+                </div>
                 <!-- ACCORDION 1: ADDRESS -->
                 <details class="accordion" open>
                     <summary>Address Data <span class="arrow">▼</span></summary>
                     <div class="results-grid" id="addressGrid">
-                        <div class="full-width"><div class="result-tile"><label>Land Registry Address</label><div class="result-value" id="lrAddressText">--</div><button class="icon-copy-btn" onclick="copyText('lrAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile primary-result-tile"><label>Land Registry Address</label><div class="result-value" id="lrAddressText">--</div><button class="icon-copy-btn" onclick="copyText('lrAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
                         <div class="full-width"><div class="result-tile"><label>English Address (ALS)</label><div class="result-value" id="engAddressText">--</div><button class="icon-copy-btn" onclick="copyText('engAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
                         <div class="full-width"><div class="result-tile"><label>Chinese Address (ALS)</label><div class="result-value" id="chiAddressText">--</div><button class="icon-copy-btn" onclick="copyText('chiAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
                         <div><div class="result-tile"><label>Building Name (Eng)</label><div class="result-value" id="bldgEngText">--</div><button class="icon-copy-btn" onclick="copyText('bldgEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
@@ -400,10 +569,10 @@
             <div class="map-column" id="mapSection">
                 <div id="mapWrapper">
                     <div class="map-quick-actions">
-                        <button class="map-action-btn" id="mapLangBtn" onclick="toggleMapLang()">🈯 中 / EN</button>
-                        <button class="map-action-btn" onclick="recenterMap()">🎯 Recenter</button>
-                        <button class="map-action-btn" onclick="openGoogleMaps()">📍 Google Maps</button>
-                        <button class="map-action-btn" onclick="copyCoords()">📋 Copy Coords</button>
+                        <button class="map-action-btn" id="mapLangBtn" onclick="toggleMapLang()" aria-label="Switch map labels"><span class="map-action-icon">🈯</span><span class="map-action-label"> 中 / EN</span></button>
+                        <button class="map-action-btn" onclick="recenterMap()" aria-label="Recenter map"><span class="map-action-icon">🎯</span><span class="map-action-label"> Recenter</span></button>
+                        <button class="map-action-btn" onclick="openGoogleMaps()" aria-label="Open Google Maps"><span class="map-action-icon">📍</span><span class="map-action-label"> Google Maps</span></button>
+                        <button class="map-action-btn" onclick="copyCoords()" aria-label="Copy coordinates"><span class="map-action-icon">📋</span><span class="map-action-label"> Copy Coords</span></button>
                     </div>
                     <div id="mapContainer" style="height: 100%; width: 100%; z-index: 1;"></div>
                     <div id="mapPlaceholder" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #888888; background: #f8fafc; z-index: 1000; font-weight: bold;">Map will appear here</div>
@@ -428,18 +597,28 @@
                 </div>
             </div>
 
-            <!-- 2. Core Identifiers -->
-            <div class="section-title">2. Core Identifiers</div>
-            <div class="row-2">
-                <div class="input-wrapper">
-                    <label>Building / Estate Name</label>
-                    <input type="text" class="pim-input" id="inpDev" placeholder="e.g. Melody Garden / Le Prime" disabled autocomplete="off">
-                    <div id="suggestDev" class="autocomplete-list"></div>
+            <!-- 2. Core Search -->
+            <div class="section-title">2. Core Search</div>
+            <div class="pim-primary-fields">
+                <div class="pim-primary-note">Use any combination of these primary search fields. Free Format is useful when the address wording is uncertain.</div>
+                <div class="row-2" style="margin-bottom: 12px;">
+                    <div class="input-wrapper">
+                        <label>Building / Estate Name</label>
+                        <input type="text" class="pim-input" id="inpDev" placeholder="e.g. Melody Garden / Le Prime" disabled autocomplete="off">
+                        <div id="suggestDev" class="autocomplete-list"></div>
+                    </div>
+                    <div class="input-wrapper">
+                        <label>Street Name</label>
+                        <input type="text" class="pim-input" id="inpStreet" placeholder="e.g. Nathan Road" disabled autocomplete="off">
+                        <div id="suggestStreet" class="autocomplete-list"></div>
+                    </div>
                 </div>
-                <div class="input-wrapper">
-                    <label>Street Name</label>
-                    <input type="text" class="pim-input" id="inpStreet" placeholder="e.g. Nathan Road" disabled autocomplete="off">
-                    <div id="suggestStreet" class="autocomplete-list"></div>
+                <div class="row-1" style="margin-bottom: 0;">
+                    <div class="input-wrapper">
+                        <label>Free Format Search</label>
+                        <input type="text" class="pim-input" id="inpFreeFormat" placeholder="e.g. Shin Lun House / 12 Tai Po Road" disabled autocomplete="off">
+                        <small style="color: #64748b; margin-top: 6px; display: block; font-weight: 500;">Search any keywords contained in the Land Registry free-format address.</small>
+                    </div>
                 </div>
             </div>
 
@@ -464,17 +643,7 @@
                 </div>
             </div>
 
-            <!-- 4. Advanced / Fallback -->
-            <div class="section-title">4. Advanced Fallback</div>
-            <div class="row-1" style="margin-bottom: 25px;">
-                <div class="input-wrapper">
-                    <label>Free Format Search</label>
-                    <input type="text" class="pim-input" id="inpFreeFormat" placeholder="e.g. Shin Lun House" disabled autocomplete="off">
-                    <small style="color: #64748b; margin-top: 6px; display: block; font-weight: 500;">*Use this to search for any keywords in the free-format address.</small>
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 15px;">
+            <div style="display: flex; gap: 15px; margin-top: 25px;">
                 <button class="action-btn pim-btn" id="pimSearchBtn" disabled onclick="executePIMSearch()">
                     <span class="spinner" id="pimSearchSpinner"></span>
                     <span id="pimSearchBtnText">Identify PRN</span>
@@ -484,7 +653,10 @@
         </div>
 
         <div class="card pim-card" id="pimResultsCard" style="display: none;">
-            <h3 style="margin-top: 0; color: var(--primary-dark); display: inline-block; margin-right: 15px;">Search Results</h3>
+            <div class="pim-results-heading">
+                <h3>Search Results</h3>
+                <div class="pim-results-subtitle" id="pimResultsSummary">--</div>
+            </div>
             <div id="resultsWarning"></div>
             <div style="overflow-x: auto; max-height: 500px;">
                 <table class="pim-table">
@@ -918,11 +1090,13 @@
                     pimEnterInitialized = true;
                 }
 
-                const cacheNote = cacheInfo && cacheInfo.fromCache ? " (cached)" : "";
-                if (cacheInfo && cacheInfo.cacheSaved === false) {
-                    document.getElementById("dbStatus").textContent = `System Ready!${versionDisplay} — session cache unavailable`;
+                const statusEl = document.getElementById("dbStatus");
+                if (cacheInfo && cacheInfo.fromCache) {
+                    statusEl.textContent = `⚡ Ready · Local cache${versionDisplay}`;
+                } else if (cacheInfo && cacheInfo.cacheSaved === false) {
+                    statusEl.textContent = `⚡ Ready · Session only${versionDisplay}`;
                 } else {
-                    document.getElementById("dbStatus").textContent = `System Ready!${versionDisplay}${cacheNote}`;
+                    statusEl.textContent = `⚡ Ready · Cached locally${versionDisplay}`;
                 }
 
                 setTimeout(() => {
@@ -1031,9 +1205,17 @@
         const results = fuseInstance.search(val, { limit: 8 });
 
         listEl.innerHTML = '';
+        if (results.length > 0) {
+            const meta = document.createElement('div');
+            meta.className = 'autocomplete-meta';
+            meta.textContent = `${results.length} suggestion${results.length === 1 ? '' : 's'}`;
+            listEl.appendChild(meta);
+        }
+
         results.forEach(res => {
             const option = document.createElement('div');
-            option.textContent = res.item;
+            option.className = 'autocomplete-option';
+            option.innerHTML = highlightAutocompleteText(res.item, val);
             option.addEventListener('click', () => {
                 selectSuggestion(inputId, listId, res.item, nextInputId);
             });
@@ -1044,7 +1226,9 @@
             listEl.style.display = 'block';
             listEl.currentFocus = -1;
         } else {
-            listEl.style.display = 'none';
+            listEl.innerHTML = '<div class="autocomplete-empty">No matching suggestions</div>';
+            listEl.style.display = 'block';
+            listEl.currentFocus = -1;
         }
     }
 
@@ -1067,7 +1251,8 @@
         const input = document.getElementById(inputId);
         const listEl = document.getElementById(listId);
         input.addEventListener("keydown", function(e) {
-            let items = listEl.style.display === 'block' ? listEl.getElementsByTagName("div") : null;
+            const nodeList = listEl.style.display === 'block' ? listEl.querySelectorAll('.autocomplete-option') : null;
+            const items = nodeList ? Array.from(nodeList) : null;
             if (e.key === "ArrowDown" && items && items.length > 0) { e.preventDefault(); listEl.currentFocus++; addActiveItem(items, listEl); }
             else if (e.key === "ArrowUp" && items && items.length > 0) { e.preventDefault(); listEl.currentFocus--; addActiveItem(items, listEl); }
             else if (e.key === "Enter" && items && items.length > 0 && listEl.currentFocus > -1) {
@@ -1113,6 +1298,7 @@
         document.getElementById('pimResultsCard').style.display = 'none';
         document.getElementById('resultsTableBody').innerHTML = '';
         document.getElementById('resultsWarning').style.display = 'none';
+        document.getElementById('pimResultsSummary').textContent = '--';
         document.getElementById('inpDistrict').focus();
     }
 
@@ -1180,13 +1366,21 @@
                 let displayCount = Math.min(results.length, 20);
                 const warningBanner = document.getElementById('resultsWarning');
 
+                document.getElementById('pimResultsSummary').textContent = results.length > 0
+                    ? `${Math.min(results.length, 20)} shown${results.length > 20 ? ` of 20+` : ''}`
+                    : 'No matches';
+
                 if (results.length > 20) {
                     warningBanner.className = "warning-red";
-                    warningBanner.innerHTML = "⚠️ Showing top 20 matches. Over 20 results found—please refine your search (e.g., add Block, Floor, or Flat).";
+                    warningBanner.innerHTML = "⚠️ Showing the first 20 matches. Add Block, Floor or Flat to narrow the result set.";
                     warningBanner.style.display = "block";
                 } else if (results.length > 0) {
                     warningBanner.className = "warning-green";
-                    warningBanner.innerHTML = `✅ Found matches: ${results.length}`;
+                    warningBanner.innerHTML = `✅ Found ${results.length} match${results.length === 1 ? '' : 'es'}.`;
+                    warningBanner.style.display = "block";
+                } else {
+                    warningBanner.className = "warning-red";
+                    warningBanner.innerHTML = "No matching PRNs found." + buildZeroResultHelp({ dev, street, freeFormat, streetNo, block, floor, flat });
                     warningBanner.style.display = "block";
                 }
 
@@ -1261,14 +1455,94 @@
 
     function recenterMap() { if (miniMap && currentLat && currentLng) miniMap.setView([currentLat, currentLng], 18); }
     function openGoogleMaps() { if (currentLat && currentLng) window.open(`https://www.google.com/maps/search/?api=1&query=${currentLat},${currentLng}`, '_blank'); }
-    function copyCoords() {
-        if (currentLat && currentLng) {
-            navigator.clipboard.writeText(`${currentLat}, ${currentLng}`);
-            alert("Coordinates copied to clipboard!");
+    async function copyCoords() {
+        if (!(currentLat && currentLng)) return;
+        const value = `${currentLat}, ${currentLng}`;
+        try {
+            await navigator.clipboard.writeText(value);
+            const btn = document.querySelector('.map-action-btn[aria-label="Copy coordinates"]');
+            const label = btn?.querySelector('.map-action-label');
+            if (label) {
+                const original = label.textContent;
+                label.textContent = ' Copied';
+                setTimeout(() => { label.textContent = original; }, 1400);
+            }
+        } catch (e) {
+            alert(`Coordinates: ${value}`);
         }
     }
 
     const escapeXML = (str) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+    function useSearchExample(value) {
+        const input = document.getElementById('unifiedSearchInput');
+        if (!input || input.disabled) return;
+        input.value = value;
+        input.focus();
+        handleAutoDetect();
+    }
+
+    function viewResultMap() {
+        if (window.innerWidth <= 992) {
+            setMobileResultView('map');
+        } else {
+            document.getElementById('mapSection')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    function setMobileResultView(view) {
+        const container = document.getElementById('resultsContainer');
+        const dataBtn = document.getElementById('mobileDataBtn');
+        const mapBtn = document.getElementById('mobileMapBtn');
+        if (!container || !dataBtn || !mapBtn) return;
+        const isMap = view === 'map';
+        container.classList.toggle('mobile-map-view', isMap);
+        container.classList.toggle('mobile-data-view', !isMap);
+        dataBtn.classList.toggle('active', !isMap);
+        mapBtn.classList.toggle('active', isMap);
+        if (isMap && miniMap) setTimeout(() => miniMap.invalidateSize(), 50);
+    }
+
+    function setResultSummary(title, text, icon = '✓') {
+        const card = document.getElementById('resultSummary');
+        const titleEl = document.getElementById('resultSummaryTitle');
+        const textEl = document.getElementById('resultSummaryText');
+        const iconEl = card?.querySelector('.result-summary-icon');
+        if (!card || !titleEl || !textEl) return;
+        titleEl.textContent = title || '';
+        textEl.textContent = text || '';
+        if (iconEl) iconEl.textContent = icon;
+        card.style.display = 'flex';
+    }
+
+    function buildPimFilterSummary(values) {
+        const labels = [
+            ['Building', values.dev], ['Street', values.street], ['Free Format', values.freeFormat],
+            ['Street No.', values.streetNo], ['Block', values.block], ['Floor', values.floor], ['Flat', values.flat]
+        ];
+        return labels.filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`).join(' · ');
+    }
+
+    function buildZeroResultHelp(values) {
+        const used = buildPimFilterSummary(values);
+        const suggestions = [];
+        if (values.flat) suggestions.push('remove Flat');
+        if (values.floor) suggestions.push('remove Floor');
+        if (values.streetNo) suggestions.push('remove Street No.');
+        if (values.block) suggestions.push('remove Block');
+        if (!values.freeFormat) suggestions.push('try Free Format Search');
+        const tip = suggestions.slice(0, 3).join(' · ');
+        return `<div class="pim-zero-help"><strong>Search used:</strong> ${escapeXML(used || 'No filters')}<br><strong>Try:</strong> ${escapeXML(tip || 'broaden the wording or check spelling')}</div>`;
+    }
+
+    function highlightAutocompleteText(text, query) {
+        const safeText = escapeXML(text);
+        const safeQuery = String(query || '').trim();
+        if (!safeQuery) return safeText;
+        const escaped = safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(escaped, 'ig');
+        return safeText.replace(re, match => `<span class="autocomplete-match">${match}</span>`);
+    }
 
     function setManualMode(mode) {
         currentSearchMode = mode;
@@ -1318,6 +1592,16 @@
         if (e.key === 'Enter' && !this.disabled) { e.preventDefault(); document.getElementById('unifiedSearchBtn').click(); }
     });
 
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            const search = document.getElementById('unifiedSearchInput');
+            if (search && !search.disabled) { e.preventDefault(); search.focus(); search.select(); }
+        }
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.autocomplete-list').forEach(list => list.style.display = 'none');
+        }
+    });
+
     function cleanChineseNum(str) { if (!str) return ""; return str.replace(/\s+AND\s+/g, '及').replace(/\s*&\s*/g, '及').replace(/\s*-\s*/g, '-').replace(/\s*\/\s*/g, '/'); }
 
     function updateUIField(textId, value) {
@@ -1339,8 +1623,13 @@
     function prepareUI() {
         document.getElementById('welcomeState').style.display = 'none';
         document.getElementById('resultsContainer').classList.add('active');
+        document.getElementById('resultsContainer').classList.remove('mobile-map-view');
+        document.getElementById('resultsContainer').classList.add('mobile-data-view');
+        document.getElementById('mobileDataBtn')?.classList.add('active');
+        document.getElementById('mobileMapBtn')?.classList.remove('active');
         document.getElementById('searchSpinner').style.display = 'inline-block';
-        if (window.innerWidth <= 992) document.getElementById('jumpToMapBtn').style.display = 'block';
+        const query = document.getElementById('unifiedSearchInput')?.value.trim() || '';
+        setResultSummary('Searching…', query ? `Looking up: ${query}` : 'Preparing results…', '⌕');
 
         resultFields.forEach(f => {
             const el = document.getElementById(f);
@@ -1364,6 +1653,11 @@
             }
         });
         document.getElementById('searchSpinner').style.display = 'none';
+        const summaryTitle = document.getElementById('resultSummaryTitle');
+        if (!summaryTitle || summaryTitle.textContent === 'Searching…') {
+            const query = document.getElementById('unifiedSearchInput')?.value.trim() || '';
+            setResultSummary('Search complete', query ? `Results for: ${query}` : 'Results ready', '✓');
+        }
     }
 
 
@@ -1718,6 +2012,7 @@
 
         if (row) {
             updateUIField('lrAddressText', row.FREE_FORMAT_ADDR_ENG);
+            setResultSummary('Search complete', `${val} · ${row.FREE_FORMAT_ADDR_ENG || 'Address found'}`, '✓');
             let pStr = row.STREET_NAME_ENG ? row.STREET_NAME_ENG.toString().trim() : "";
             let pNum = (row.HOUSE_NUM_PREFIX ? row.HOUSE_NUM_PREFIX.toString().trim() : "") + (row.HOUSE_NUM_SUFFIX ? row.HOUSE_NUM_SUFFIX.toString().trim() : "");
             let cleanAddr = row.FREE_FORMAT_ADDR_ENG ? row.FREE_FORMAT_ADDR_ENG.toUpperCase() : [(row.ESTATE_NAME_ENG||""), (row.BLDG_NAME_ENG||row.BUILDING_NAME_ENG||""), ((pNum===""||dummyNumbers.includes(pNum)) ? pStr : `${pNum} ${pStr}`)].filter(Boolean).join(", ");
@@ -1728,7 +2023,11 @@
         fallbackClearLoading();
     }
 
-    async function executeADDRSearch(val, isCode) { prepareUI(); await fetchALSAndCSDI(val, null, "", "", isCode); fallbackClearLoading(); }
+    async function executeADDRSearch(val, isCode) {
+        prepareUI();
+        await fetchALSAndCSDI(val, null, "", "", isCode);
+        fallbackClearLoading();
+    }
 
     async function executeBDOpSearch(type, val) {
         prepareUI();
