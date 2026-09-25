@@ -3,8 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <title>Universal Spatial Search Engine · Mobile Beta</title>
+    <!-- iPhone / iPad Home Screen Web App -->
+    <link rel="apple-touch-icon" href="favicon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="USSE">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <title>Universal Spatial Search Engine</title>
     
     <!-- Fuse.js for Fuzzy Search -->
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
@@ -463,7 +468,7 @@
 
             <div class="search-input-group">
                 <div class="search-input-shell">
-                    <input type="text" id="unifiedSearchInput" placeholder="Search PRN, address, BuildingCSUID, Block ID or OP No." disabled oninput="handleAutoDetect()" aria-label="Spatial search">
+                    <input type="text" id="unifiedSearchInput" placeholder="Search PRN, address, GeoAddress Code, BlockID or OP No." disabled oninput="handleAutoDetect()" aria-label="Spatial search">
                     <span class="search-input-hint">Enter</span>
                 </div>
                 <button class="action-btn" id="unifiedSearchBtn" disabled onclick="executeUnifiedSearch()">
@@ -479,14 +484,15 @@
 
         <div id="welcomeState">
             <div class="welcome-inner">
-                <div class="welcome-kicker">Lightning-fast local search</div>
                 <h3>Search Hong Kong property data</h3>
-                <p>Type any identifier or address. The engine will detect the input type automatically, or you can choose a search mode above.</p>
+                <p>Type any identifier or address. The engine will detect the input type automatically, or you can choose a search mode manually.</p>
                 <div class="example-row">
-                    <span class="example-chip">Melody Garden</span>
-                    <span class="example-chip">Nathan Road</span>
-                    <span class="example-chip"><code>PRN&nbsp;A1234567</code></span>
-                    <span class="example-chip">BuildingCSUID</span>
+                    <span class="example-chip">CENTRAL GOVERNMENT OFFICES</span>
+                    <span class="example-chip">5 GLOUCESTER ROAD</span>
+                    <span class="example-chip"><code>D0735222</code></span>
+                    <span class="example-chip">NK29/98</span>
+                    <span class="example-chip">4090519420T20050430</span>
+
                 </div>
             </div>
         </div>
