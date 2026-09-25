@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <title>Universal Spatial Search Engine</title>
@@ -412,6 +414,8 @@
     </style>
 </head>
 <body>
+
+<div style="position: fixed; top: 0; left: 0; right: 0; height: 1px; background-color: var(--bg-app); z-index: 10000;" aria-hidden="true"></div>    
 
 <!-- Centralized SVG Copy Icon to drastically reduce DOM size -->
 <svg style="display: none;">
