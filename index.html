@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="favicon.png">
-    <title>Universal Spatial Search Engine</title>
+    <title>Universal Spatial Search Engine · Mobile Beta</title>
     
-    <!-- SQLite -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
     <!-- Fuse.js for Fuzzy Search -->
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <!-- Leaflet Map CSS & JS -->
@@ -746,6 +744,139 @@
     const AUTOCOMPLETE_URL = "autocomplete_dict.json";
     const DB_R2_URL = "https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev/PRN_Data.db.gz";
 
+    // iPhone/iPad beta backend: streamed SQLite import into OPFS, queried by a Worker.
+    // This avoids materializing the ~736 MB SQLite file in the Safari UI/WASM heap.
+    const MOBILE_BETA_META_KEY = "usseMobileBetaDbVersion";
+    const MOBILE_BETA_WORKER_URL = "sqlite-mobile-worker.js";
+    let mobileSQLiteWorker = null;
+    let mobileSQLiteReady = false;
+
+    function loadDesktopSqlJs() {
+        return new Promise((resolve, reject) => {
+            if (typeof initSqlJs === "function") {
+                resolve();
+                return;
+            }
+            const script = document.createElement("script");
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js";
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("SQLite engine failed to load."));
+            document.head.appendChild(script);
+        });
+    }
+    let mobileSQLiteRequestId = 0;
+    const mobileSQLitePending = new Map();
+
+    function isAppleTouchDevice() {
+        const ua = navigator.userAgent || "";
+        return /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    }
+
+    function databaseIsReady() {
+        return mobileSQLiteReady || !!activeDB;
+    }
+
+    function mobileWorkerCall(type, payload = {}) {
+        return new Promise((resolve, reject) => {
+            if (!mobileSQLiteWorker) {
+                reject(new Error("Mobile SQLite worker is not initialized."));
+                return;
+            }
+            const id = ++mobileSQLiteRequestId;
+            mobileSQLitePending.set(id, { resolve, reject });
+            mobileSQLiteWorker.postMessage({ id, type, ...payload });
+        });
+    }
+
+    function setupMobileSQLiteWorker() {
+        return new Promise((resolve, reject) => {
+            try {
+                const worker = new Worker(MOBILE_BETA_WORKER_URL, { type: "module" });
+                mobileSQLiteWorker = worker;
+                worker.onmessage = (event) => {
+                    const msg = event.data || {};
+                    if (msg.type === "progress") {
+                        updateLoadingProgress(Number(msg.percent) || 0, msg.text || "Loading mobile database...");
+                        return;
+                    }
+                    if (msg.type === "fatal") {
+                        const pending = mobileSQLitePending.get(msg.id);
+                        if (pending) {
+                            mobileSQLitePending.delete(msg.id);
+                            pending.reject(new Error(msg.error || "Mobile SQLite worker failed."));
+                        }
+                        return;
+                    }
+                    if (!msg.id) return;
+                    const pending = mobileSQLitePending.get(msg.id);
+                    if (!pending) return;
+                    mobileSQLitePending.delete(msg.id);
+                    if (msg.ok) pending.resolve(msg.result);
+                    else pending.reject(new Error(msg.error || "Mobile SQLite operation failed."));
+                };
+                worker.onerror = (event) => {
+                    const message = event?.message || "Mobile SQLite worker crashed.";
+                    for (const { reject: rejectPending } of mobileSQLitePending.values()) rejectPending(new Error(message));
+                    mobileSQLitePending.clear();
+                    reject(new Error(message));
+                };
+                resolve(worker);
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    async function initializeMobileSQLite(manifest) {
+        updateLoadingProgress(20, "Starting mobile SQLite engine...");
+        await setupMobileSQLiteWorker();
+
+        const version = manifest?.database?.sha256 || "";
+        const expectedRawBytes = Number(manifest?.database?.rawBytes) || 0;
+        const rowCount = Number(manifest?.rowCount) || 0;
+        const cachedVersion = localStorage.getItem(MOBILE_BETA_META_KEY) || "";
+
+        const result = await mobileWorkerCall("open", {
+            dbUrl: DB_R2_URL,
+            dbPath: "/PRN_Data.db",
+            expectedRawBytes,
+            expectedRowCount: rowCount,
+            expectedVersion: version,
+            cachedVersion
+        });
+
+        mobileSQLiteReady = true;
+        if (version) localStorage.setItem(MOBILE_BETA_META_KEY, version);
+
+        const records = rowCount ? ` · ${rowCount.toLocaleString()} records` : "";
+        const fromCache = result?.fromCache === true;
+        const versionText = result?.version ? ` [DB ver.: ${String(result.version).slice(0, 8)}]` : "";
+        document.getElementById("dbStatus").className = "status success";
+        document.getElementById("dbStatus").textContent = fromCache
+            ? `⚡ Ready · iPhone local database${versionText}${records}`
+            : `⚡ Ready · iPhone database cached${versionText}${records}`;
+
+        updateLoadingProgress(100, "System Ready!");
+        return result;
+    }
+
+    async function queryAddressDatabase(sql, params = []) {
+        if (mobileSQLiteReady) {
+            return await mobileWorkerCall("query", { sql, params });
+        }
+
+        if (!activeDB) throw new Error("Database is not ready.");
+        const stmt = activeDB.prepare(sql);
+        try {
+            stmt.bind(params);
+            const rows = [];
+            while (stmt.step()) rows.push(stmt.getAsObject());
+            return rows;
+        } finally {
+            stmt.free();
+        }
+    }
+
     let currentManifest = null;
     let dbInitStarted = false;
     let autocompleteInitialized = false;
@@ -1153,18 +1284,42 @@
         dbInitStarted = true;
 
         try {
-            updateLoadingProgress(10, "Loading SQLite Engine...");
+            updateLoadingProgress(10, "Loading database configuration...");
 
             const manifestPromise = fetchDatabaseManifest();
-            const sqlPromise = initSqlJs({
-                locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
-            });
-
             const manifest = await manifestPromise;
             currentManifest = manifest;
 
             const dictPromise = fetchAutocompleteDictionary(manifest);
-            SQL = await sqlPromise;
+
+            if (isAppleTouchDevice()) {
+                // IMPORTANT: do not instantiate sql.js / load the 736 MB database into memory on iPhone/iPad.
+                await Promise.all([dictPromise, initializeMobileSQLite(manifest)]);
+                document.getElementById("unifiedSearchInput").disabled = false;
+                document.getElementById("unifiedSearchBtn").disabled = false;
+                document.querySelectorAll(".pim-input").forEach(el => el.disabled = false);
+                document.getElementById("pimSearchBtn").disabled = false;
+                if (!autocompleteInitialized && window.pimDictionary) {
+                    setupAutocomplete();
+                    autocompleteInitialized = true;
+                }
+                if (!pimEnterInitialized) {
+                    setupEnterToSearchPIM();
+                    pimEnterInitialized = true;
+                }
+                setTimeout(() => {
+                    const overlay = document.getElementById("loadingOverlay");
+                    overlay.style.opacity = "0";
+                    setTimeout(() => overlay.style.display = "none", 500);
+                }, 300);
+                return;
+            }
+
+            updateLoadingProgress(10, "Loading SQLite Engine...");
+            await loadDesktopSqlJs();
+            SQL = await initSqlJs({
+                locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
+            });
 
             const [dbResult] = await Promise.all([
                 loadDatabaseFromCacheOrNetwork(manifest),
@@ -1327,7 +1482,7 @@
     }
 
     function executePIMSearch() {
-        if (!activeDB) return;
+        if (!databaseIsReady()) return;
 
         const district = document.getElementById('inpDistrict').value.trim().toUpperCase();
         const dev = document.getElementById('inpDev').value.trim().toUpperCase();
@@ -1350,7 +1505,7 @@
         btn.disabled = true; spinner.style.display = 'inline-block'; btnText.textContent = 'Searching...';
         document.getElementById('resultsWarning').style.display = 'none';
 
-        setTimeout(() => {
+        setTimeout(async () => {
             let query = "SELECT PRN, FREE_FORMAT_ADDR_ENG, FREE_FORMAT_ADDR_CHN FROM addresses WHERE 1=1";
             let params = [];
 
@@ -1379,13 +1534,8 @@
             query += " LIMIT 21"; 
 
             try {
-                let stmt = activeDB.prepare(query);
-                stmt.bind(params);
                 const tbody = document.getElementById('resultsTableBody'); tbody.innerHTML = "";
-                
-                let results = [];
-                while (stmt.step()) results.push(stmt.getAsObject());
-                stmt.free();
+                const results = await queryAddressDatabase(query, params);
 
                 let displayCount = Math.min(results.length, 20);
                 const warningBanner = document.getElementById('resultsWarning');
@@ -1594,7 +1744,7 @@
 
     function executeUnifiedSearch() {
         const rawInput = document.getElementById('unifiedSearchInput').value.trim();
-        if (!rawInput || !activeDB) return;
+        if (!rawInput || !databaseIsReady()) return;
         
         const val = rawInput.toUpperCase();
         let targetAction = currentSearchMode;
@@ -2004,17 +2154,14 @@
     // ==========================================
     async function executePRNSearch(val) {
         prepareUI();
-        let stmt = activeDB.prepare("SELECT * FROM addresses WHERE PRN = ?");
-        stmt.bind([val]);
         let row = null; let isLotPrnFallback = false;
-        if (stmt.step()) row = stmt.getAsObject();
-        stmt.free();
+
+        const directRows = await queryAddressDatabase("SELECT * FROM addresses WHERE PRN = ?", [val]);
+        if (directRows.length) row = directRows[0];
 
         if (!row) {
-            stmt = activeDB.prepare("SELECT * FROM addresses WHERE FIRST_REFERENCE_LOT_PRN = ? LIMIT 1");
-            stmt.bind([val]);
-            if (stmt.step()) { row = stmt.getAsObject(); isLotPrnFallback = true; }
-            stmt.free();
+            const fallbackRows = await queryAddressDatabase("SELECT * FROM addresses WHERE FIRST_REFERENCE_LOT_PRN = ? LIMIT 1", [val]);
+            if (fallbackRows.length) { row = fallbackRows[0]; isLotPrnFallback = true; }
         }
 
         let refPrn = (row && !isLotPrnFallback) ? (row.FIRST_REFERENCE_LOT_PRN ? row.FIRST_REFERENCE_LOT_PRN.toString().trim() : "") : val;
