@@ -568,7 +568,6 @@
     }
 
     const DB_STORAGE_NAME = "PRN_App_Storage";
-    const DB_STORAGE_VERSION = 1;
     const DB_STORE_NAME = "files";
     const DB_CACHE_ID = "masterDB";
     const DB_MANIFEST_URL = "database-manifest.json";
@@ -580,18 +579,51 @@
     let autocompleteInitialized = false;
     let pimEnterInitialized = false;
 
+    function ensureFilesStore(db) {
+        if (!db.objectStoreNames.contains(DB_STORE_NAME)) {
+            db.createObjectStore(DB_STORE_NAME, { keyPath: "id" });
+        }
+    }
+
     function openLocalDatabase() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open(DB_STORAGE_NAME, DB_STORAGE_VERSION);
+            // Do not pass a hard-coded version here. Older USSE builds may have
+            // already created PRN_App_Storage at a higher version (for example v3).
+            // Asking IndexedDB to open that database at v1 throws VersionError.
+            const req = indexedDB.open(DB_STORAGE_NAME);
 
             req.onupgradeneeded = function(e) {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains(DB_STORE_NAME)) {
-                    db.createObjectStore(DB_STORE_NAME, { keyPath: "id" });
-                }
+                ensureFilesStore(e.target.result);
             };
 
-            req.onsuccess = () => resolve(req.result);
+            req.onsuccess = () => {
+                const db = req.result;
+                db.onversionchange = () => db.close();
+
+                // A legacy database at a higher version may not have the cache
+                // store. Upgrade it by exactly one version rather than attempting
+                // to downgrade it.
+                if (db.objectStoreNames.contains(DB_STORE_NAME)) {
+                    resolve(db);
+                    return;
+                }
+
+                const nextVersion = db.version + 1;
+                db.close();
+                const upgradeReq = indexedDB.open(DB_STORAGE_NAME, nextVersion);
+
+                upgradeReq.onupgradeneeded = function(e) {
+                    ensureFilesStore(e.target.result);
+                };
+                upgradeReq.onsuccess = () => {
+                    const upgradedDb = upgradeReq.result;
+                    upgradedDb.onversionchange = () => upgradedDb.close();
+                    resolve(upgradedDb);
+                };
+                upgradeReq.onerror = () => reject(upgradeReq.error || new Error("IndexedDB migration failed."));
+                upgradeReq.onblocked = () => reject(new Error("IndexedDB migration is blocked by another tab or browser process."));
+            };
+
             req.onerror = () => reject(req.error || new Error("IndexedDB could not be opened."));
             req.onblocked = () => reject(new Error("IndexedDB is blocked by another tab or browser process."));
         });
@@ -731,7 +763,7 @@
 
             if (expectedVersion && !cached.version) {
                 // Compatibility with the original IndexedDB cache format:
-                // database_version.js stored a YYYYMMDD_* value only in localStorage.
+                // older builds stored the cache version only in localStorage.
                 const legacyVersion = localStorage.getItem("cachedDbVersion") || "";
                 const manifestDate = String(manifest?.builtAtUtc || "").slice(0, 10).replace(/-/g, "");
                 const legacyMatchesBuildDate = /^\d{8}_/.test(legacyVersion) && manifestDate && legacyVersion.startsWith(manifestDate);
