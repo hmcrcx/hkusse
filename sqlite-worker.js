@@ -1,5 +1,5 @@
 const WA_SQLITE_BASE = 'https://cdn.jsdelivr.net/gh/rhashimoto/wa-sqlite@v1.1.1';
-const WORKER_BUILD = '20260924-opfs-query-fix-1';
+const WORKER_BUILD = '20260925-pim-fast-path-1';
 let SQLiteESMFactory = null;
 let SQLite = null;
 let OPFSAnyContextVFS = null;
@@ -266,38 +266,121 @@ async function searchPIM(input) {
   const floor = (input.floor || '').trim().toUpperCase();
   const flat = (input.flat || '').trim().toUpperCase();
 
-  if (!dev && !street && !freeFormat) return { rows: [], truncated: false, error: 'Please enter at least a Building/Estate Name, Street Name, or Free Format Search.' };
+  if (!dev && !street && !freeFormat) {
+    return {
+      rows: [],
+      truncated: false,
+      error: 'Please enter a Building/Estate Name, Street Name, or Free Format Search.'
+    };
+  }
 
-  const where = [], whereParams = [], score = [], scoreParams = [];
-  addTextFilter(where, whereParams, 'AREA_DESC_ENG', 'AREA_DESC_CHN', district);
-  addTextFilter(where, whereParams, 'DEV_NAME_ENG', 'DEV_NAME_CHN', dev);
-  addTextFilter(where, whereParams, 'STREET_NAME_ENG', 'STREET_NAME_CHN', street);
-  addFreeFormatFilters(where, whereParams, freeFormat);
+  function addExact(parts, params, engCol, chiCol, value) {
+    if (!value) return;
+    parts.push(`(${engCol} = ? OR ${chiCol} = ?)`);
+    params.push(value, value);
+  }
 
-  if (streetNo) { where.push("(HOUSE_NUM_PREFIX = ? OR (HOUSE_NUM_PREFIX || HOUSE_NUM_SUFFIX) = ?)"); whereParams.push(streetNo, streetNo); }
-  if (block) { where.push('BLOCK COLLATE NOCASE = ?'); whereParams.push(block); }
-  if (floor) { where.push('FLOOR COLLATE NOCASE = ?'); whereParams.push(floor); }
-  if (flat) { where.push('FLAT COLLATE NOCASE = ?'); whereParams.push(flat); }
+  function addPrefix(parts, params, engCol, chiCol, value) {
+    if (!value) return;
+    parts.push(`(${engCol} LIKE ? OR ${chiCol} LIKE ?)`);
+    params.push(escapeLike(value) + '%', escapeLike(value) + '%');
+  }
 
-  if (district) { score.push('(CASE WHEN AREA_DESC_ENG = ? OR AREA_DESC_CHN = ? THEN 30 ELSE 0 END)'); scoreParams.push(district, district); }
-  if (dev) { score.push('(CASE WHEN DEV_NAME_ENG = ? OR DEV_NAME_CHN = ? THEN 100 WHEN DEV_NAME_ENG LIKE ? OR DEV_NAME_CHN LIKE ? THEN 60 ELSE 0 END)'); scoreParams.push(dev, dev, escapeLike(dev) + '%', escapeLike(dev) + '%'); }
-  if (street) { score.push('(CASE WHEN STREET_NAME_ENG = ? OR STREET_NAME_CHN = ? THEN 90 WHEN STREET_NAME_ENG LIKE ? OR STREET_NAME_CHN LIKE ? THEN 50 ELSE 0 END)'); scoreParams.push(street, street, escapeLike(street) + '%', escapeLike(street) + '%'); }
-  if (streetNo) { score.push('(CASE WHEN HOUSE_NUM_PREFIX = ? THEN 60 ELSE 0 END)'); scoreParams.push(streetNo); }
-  if (block) { score.push('(CASE WHEN BLOCK COLLATE NOCASE = ? THEN 30 ELSE 0 END)'); scoreParams.push(block); }
-  if (floor) { score.push('(CASE WHEN FLOOR COLLATE NOCASE = ? THEN 20 ELSE 0 END)'); scoreParams.push(floor); }
-  if (flat) { score.push('(CASE WHEN FLAT COLLATE NOCASE = ? THEN 20 ELSE 0 END)'); scoreParams.push(flat); }
-  if (freeFormat) { score.push('(CASE WHEN FREE_FORMAT_ADDR_ENG = ? OR FREE_FORMAT_ADDR_CHN = ? THEN 40 ELSE 0 END)'); scoreParams.push(freeFormat, freeFormat); }
+  function addMicroFilters(parts, params) {
+    if (streetNo) {
+      parts.push('(HOUSE_NUM_PREFIX = ? OR (HOUSE_NUM_PREFIX || HOUSE_NUM_SUFFIX) = ?)');
+      params.push(streetNo, streetNo);
+    }
+    if (block) { parts.push('BLOCK COLLATE NOCASE = ?'); params.push(block); }
+    if (floor) { parts.push('FLOOR COLLATE NOCASE = ?'); params.push(floor); }
+    if (flat) { parts.push('FLAT COLLATE NOCASE = ?'); params.push(flat); }
+  }
 
-  const scoreExpr = score.length ? score.join(' + ') : '0';
-  const sql = 'SELECT PRN, FREE_FORMAT_ADDR_ENG, FREE_FORMAT_ADDR_CHN, ' +
-    'AREA_DESC_ENG, AREA_DESC_CHN, DEV_NAME_ENG, DEV_NAME_CHN, ' +
-    'STREET_NAME_ENG, STREET_NAME_CHN, HOUSE_NUM_PREFIX, HOUSE_NUM_SUFFIX, ' +
-    'BLOCK, FLOOR, FLAT, (' + scoreExpr + ') AS relevance ' +
-    'FROM addresses WHERE ' + where.join(' AND ') +
-    ' ORDER BY relevance DESC, PRN ASC LIMIT 21';
+  function selectSQL(where) {
+    return 'SELECT PRN, FREE_FORMAT_ADDR_ENG, FREE_FORMAT_ADDR_CHN, ' +
+      'AREA_DESC_ENG, AREA_DESC_CHN, DEV_NAME_ENG, DEV_NAME_CHN, ' +
+      'STREET_NAME_ENG, STREET_NAME_CHN, HOUSE_NUM_PREFIX, HOUSE_NUM_SUFFIX, ' +
+      'BLOCK, FLOOR, FLAT FROM addresses WHERE ' +
+      (where.length ? where.join(' AND ') : '1') + ' LIMIT 21';
+  }
 
-  const rows = await execAll(sql, [...scoreParams, ...whereParams]);
-  return { rows, truncated: rows.length > 20 };
+  const candidateMap = new Map();
+
+  async function collect(where, params) {
+    const rows = await execAll(selectSQL(where), params);
+    for (const row of rows) {
+      const key = String(row.PRN || '');
+      if (key && !candidateMap.has(key)) candidateMap.set(key, row);
+    }
+    return rows.length;
+  }
+
+  // Fast path: exact values first. The old query calculated a relevance score
+  // for every matching row and then sorted the entire result set. On a 2.75M-row
+  // OPFS database that turns a simple Finder request into a full-table operation.
+  const exactWhere = [], exactParams = [];
+  addExact(exactWhere, exactParams, 'AREA_DESC_ENG', 'AREA_DESC_CHN', district);
+  addExact(exactWhere, exactParams, 'DEV_NAME_ENG', 'DEV_NAME_CHN', dev);
+  addExact(exactWhere, exactParams, 'STREET_NAME_ENG', 'STREET_NAME_CHN', street);
+  if (freeFormat) {
+    const tokens = freeFormat.split(/\s+/).filter(Boolean).slice(0, 12);
+    for (const token of tokens) {
+      const term = '%' + escapeLike(token) + '%';
+      exactWhere.push("(FREE_FORMAT_ADDR_ENG LIKE ? OR FREE_FORMAT_ADDR_CHN LIKE ?)");
+      exactParams.push(term, term);
+    }
+  }
+  addMicroFilters(exactWhere, exactParams);
+
+  let got = await collect(exactWhere, exactParams);
+  let usedFallback = false;
+
+  // Prefix fallback for partially typed building/street names.
+  if (got < 21 && !freeFormat && (dev || street)) {
+    const prefixWhere = [], prefixParams = [];
+    addExact(prefixWhere, prefixParams, 'AREA_DESC_ENG', 'AREA_DESC_CHN', district);
+    addPrefix(prefixWhere, prefixParams, 'DEV_NAME_ENG', 'DEV_NAME_CHN', dev);
+    addPrefix(prefixWhere, prefixParams, 'STREET_NAME_ENG', 'STREET_NAME_CHN', street);
+    addMicroFilters(prefixWhere, prefixParams);
+    const before = candidateMap.size;
+    await collect(prefixWhere, prefixParams);
+    got = candidateMap.size;
+    usedFallback = candidateMap.size > before;
+  }
+
+  // Free-format already uses contains matching; no additional full-table sort is
+  // needed. The 21-row cap lets SQLite stop as soon as enough candidates exist.
+  const rows = Array.from(candidateMap.values());
+
+  function relevance(row) {
+    let score = 0;
+    const eq = (a, b) => a && b && String(a).toUpperCase() === b;
+    const starts = (a, b) => a && b && String(a).toUpperCase().startsWith(b);
+    if (district && (eq(row.AREA_DESC_ENG, district) || eq(row.AREA_DESC_CHN, district))) score += 30;
+    if (dev) {
+      if (eq(row.DEV_NAME_ENG, dev) || eq(row.DEV_NAME_CHN, dev)) score += 100;
+      else if (starts(row.DEV_NAME_ENG, dev) || starts(row.DEV_NAME_CHN, dev)) score += 60;
+    }
+    if (street) {
+      if (eq(row.STREET_NAME_ENG, street) || eq(row.STREET_NAME_CHN, street)) score += 90;
+      else if (starts(row.STREET_NAME_ENG, street) || starts(row.STREET_NAME_CHN, street)) score += 50;
+    }
+    if (streetNo && (String(row.HOUSE_NUM_PREFIX || '').toUpperCase() === streetNo ||
+                     String(row.HOUSE_NUM_PREFIX || '').toUpperCase() + String(row.HOUSE_NUM_SUFFIX || '').toUpperCase() === streetNo)) score += 60;
+    if (block && String(row.BLOCK || '').toUpperCase() === block) score += 30;
+    if (floor && String(row.FLOOR || '').toUpperCase() === floor) score += 20;
+    if (flat && String(row.FLAT || '').toUpperCase() === flat) score += 20;
+    if (freeFormat && ((row.FREE_FORMAT_ADDR_ENG || '').toUpperCase() === freeFormat || (row.FREE_FORMAT_ADDR_CHN || '').toUpperCase() === freeFormat)) score += 40;
+    return score;
+  }
+
+  rows.sort((a, b) => relevance(b) - relevance(a) || String(a.PRN || '').localeCompare(String(b.PRN || '')));
+  const display = rows.slice(0, 21);
+  return {
+    rows: display,
+    truncated: display.length > 20,
+    fallbackUsed: usedFallback
+  };
 }
 
 self.onmessage = async event => {
