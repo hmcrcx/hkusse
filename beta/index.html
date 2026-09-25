@@ -1,0 +1,2265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <title>Universal Spatial Search Engine · Mobile Beta</title>
+    
+    <!-- Fuse.js for Fuzzy Search -->
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+    <!-- Leaflet Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Proj4js for Coordinate Conversion (HK1980 to WGS84) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
+
+    <style>
+        :root {
+            --primary-dark: #1a3c2c;
+            --primary-hover: #10261c;
+            --accent-green: #2b5c46;
+            --accent-light: #eef7f2;
+            --accent-border: #cce5d6;
+            --bg-app: #f4f6f4;
+            --bg-card: #ffffff;
+            --bg-input: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+        }
+
+        /* ----- LOADING OVERLAY ----- */
+        #loadingOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-app); z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+        .loading-card {
+            background: var(--bg-card); padding: 30px 40px; border-radius: 12px;
+            box-shadow: var(--shadow-md); text-align: center; width: 80%; max-width: 400px;
+        }
+        .loading-title { color: var(--primary-dark); font-weight: 800; font-size: 18px; margin-bottom: 20px; }
+        .progress-bar-container {
+            width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 15px;
+        }
+        .progress-bar {
+            height: 100%; background: var(--accent-green); width: 0%; transition: width 0.3s ease;
+        }
+        #loadingText { color: var(--text-muted); font-size: 13px; font-weight: 600; }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 90vw;
+            margin: auto;
+            padding: 16px 20px;
+            box-sizing: border-box;
+        }
+
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-dark);
+            padding-bottom: 10px;
+            margin-bottom: 20px; 
+            flex-shrink: 0;
+        }
+
+        .header-title-area { display: flex; align-items: center; gap: 20px; }
+        .app-header h2 { color: var(--primary-dark); margin: 0; font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
+        
+        /* View Toggle & Animations */
+        .view-toggle { display: inline-flex; background: #e2e8f0; padding: 4px; border-radius: 20px; gap: 4px; }
+        .view-btn {
+            background: transparent; border: none; padding: 6px 16px; font-size: 13px; font-weight: 700;
+            color: var(--text-muted); border-radius: 16px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .view-btn.active { background: var(--bg-card); color: var(--primary-dark); box-shadow: var(--shadow-sm); }
+        .view-btn:hover:not(.active) { color: var(--text-main); }
+
+        @keyframes slideInFromLeft {
+            0% { opacity: 0; transform: translateX(-30px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInFromRight {
+            0% { opacity: 0; transform: translateX(30px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        .view-animate-left { animation: slideInFromLeft 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .view-animate-right { animation: slideInFromRight 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        .status { font-weight: 700; color: #d9534f; font-size: 13px; }
+        .success { color: var(--primary-dark); }
+
+        /* Shared Card Styles */
+        .card {
+            background: var(--bg-card);
+            padding: 14px 18px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 20px; 
+            flex-shrink: 0;
+            z-index: 1000;
+            position: relative;
+        }
+
+        /* Unified Input Styling for BOTH views */
+        .search-input-group input, .pim-input {
+            width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 15px; background-color: var(--bg-input); color: var(--text-main); font-weight: 600;
+            box-sizing: border-box; transition: all 0.2s ease;
+        }
+        .search-input-group input:focus, .pim-input:focus { 
+            outline: none; border-color: var(--primary-dark); box-shadow: 0 0 0 2px rgba(26, 60, 44, 0.15); background-color: #ffffff; 
+        }
+        
+        .action-btn {
+            background-color: var(--primary-dark); color: white; padding: 10px 20px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; min-width: 100px;
+        }
+        .action-btn:hover { background-color: var(--primary-hover); }
+        .action-btn:disabled { background-color: #cbd5e1 !important; cursor: not-allowed; }
+
+        .spinner {
+            display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.5);
+            border-bottom-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ----- UX ENHANCEMENTS ----- */
+        .app-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .app-logo { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+        .header-copy { min-width: 0; }
+        .header-subtitle { margin-top: 2px; color: var(--text-muted); font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .db-status-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .db-status-caption { color: var(--text-muted); font-size: 10px; font-weight: 700; }
+
+        .search-top-bar { gap: 12px; }
+        .search-mode-label { display: none; font-size: 11px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+        .tab-btn { white-space: nowrap; }
+        .search-input-group { align-items: stretch; }
+        .search-input-shell { position: relative; flex: 1; min-width: 0; }
+        .search-input-shell input { padding-right: 74px; }
+        .search-input-hint { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--text-muted); border: 1px solid var(--border-color); background: #fff; border-radius: 5px; padding: 3px 5px; font-weight: 800; pointer-events: none; }
+        .search-helper { margin-top: 8px; display: flex; justify-content: space-between; gap: 10px; color: var(--text-muted); font-size: 11px; font-weight: 600; }
+        .shortcut-hint { white-space: nowrap; }
+
+        .welcome-inner { max-width: 720px; padding: 30px 20px; }
+        .welcome-kicker { color: var(--accent-green); font-size: 11px; font-weight: 900; letter-spacing: .7px; text-transform: uppercase; margin-bottom: 8px; }
+        .example-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+        .example-chip { border: 1px solid var(--border-color); background: #fff; color: var(--text-main); border-radius: 999px; padding: 7px 11px; font-size: 11px; font-weight: 750; cursor: pointer; transition: all .18s ease; box-shadow: var(--shadow-sm); }
+        .example-chip:hover { border-color: var(--accent-green); color: var(--primary-dark); transform: translateY(-1px); }
+        .example-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; }
+
+        .result-summary { display: none; align-items: center; gap: 12px; background: var(--accent-light); border: 1px solid var(--accent-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+        .primary-result-tile { padding: 12px 14px; background: #f5fbf7; border-color: var(--accent-border); }
+        .primary-result-tile .result-value { font-size: 15px; font-weight: 850; padding-right: 34px; }
+        .primary-result-tile label { color: var(--primary-dark); }
+        .result-summary-icon { width: 34px; height: 34px; border-radius: 8px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+        .result-summary-title { font-size: 13px; font-weight: 900; color: var(--primary-dark); margin-bottom: 2px; }
+        .result-summary-text { color: var(--text-muted); font-size: 11px; font-weight: 650; word-break: break-word; }
+        .result-summary-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+        .summary-action { border: 1px solid var(--accent-border); background: #fff; color: var(--primary-dark); border-radius: 7px; padding: 6px 9px; font-size: 10px; font-weight: 800; cursor: pointer; }
+
+        .autocomplete-list { padding: 3px; }
+        .autocomplete-meta { padding: 7px 9px 5px; color: var(--text-muted); font-size: 10px; font-weight: 800; pointer-events: none; border-bottom: 1px solid #f1f5f9; text-transform: uppercase; letter-spacing: .35px; }
+        .autocomplete-option { padding: 9px 8px !important; border-radius: 5px; border-bottom: 0 !important; }
+        .autocomplete-match { font-weight: 900; color: var(--primary-dark); }
+        .autocomplete-active .autocomplete-match { color: #fff; }
+        .autocomplete-empty { padding: 10px 9px; color: var(--text-muted); font-size: 12px; font-weight: 650; pointer-events: none; }
+
+        .pim-primary-fields { border: 1px solid var(--accent-border); background: var(--accent-light); border-radius: 10px; padding: 12px; margin-bottom: 18px; }
+        .pim-primary-note { font-size: 10px; color: var(--text-muted); font-weight: 700; margin-bottom: 9px; }
+        .pim-results-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+        .pim-results-heading h3 { margin: 0; color: var(--primary-dark); }
+        .pim-results-subtitle { font-size: 11px; color: var(--text-muted); font-weight: 700; }
+        .pim-zero-help { margin-top: 8px; padding: 10px 12px; background: #fff; border: 1px dashed var(--border-color); border-radius: 8px; color: var(--text-muted); font-size: 11px; font-weight: 650; line-height: 1.5; }
+        .pim-zero-help strong { color: var(--primary-dark); }
+
+        .mobile-result-toggle { display: none; }
+        .mobile-result-btn { border: 0; background: transparent; color: var(--text-muted); padding: 7px 16px; border-radius: 15px; font-size: 11px; font-weight: 850; cursor: pointer; }
+        .mobile-result-btn.active { background: #fff; color: var(--primary-dark); box-shadow: var(--shadow-sm); }
+        .map-action-label { display: inline; }
+        .map-action-icon { display: inline; }
+        .icon-copy-btn { min-width: 30px; min-height: 30px; }
+
+        @media (max-width: 992px) {
+            .app-container { padding: 8px; }
+            .app-header { align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; }
+            .header-title-area { flex: 1; min-width: 0; }
+            .app-brand { gap: 8px; }
+            .app-logo { width: 30px; height: 30px; border-radius: 7px; }
+            .app-header h2 { font-size: 17px; letter-spacing: -.35px; }
+            .header-subtitle { display: none; }
+            .db-status-wrap { align-items: flex-end; max-width: 44%; }
+            .db-status-caption { display: none; }
+            #dbStatus { font-size: 10px; line-height: 1.2; text-align: right; }
+            .view-toggle { flex-shrink: 0; }
+            .view-btn { padding: 6px 10px; font-size: 11px; }
+
+            .search-card { padding: 11px; }
+            .search-top-bar { align-items: stretch; flex-direction: column; gap: 7px; margin-bottom: 8px; }
+            .search-mode-label { display: block; }
+            .segmented-control { overflow-x: auto; width: 100%; padding: 3px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+            .segmented-control::-webkit-scrollbar { display: none; }
+            .tab-btn { flex: 0 0 auto; padding: 7px 11px; font-size: 11px; }
+            #detectedTypeBadge { align-self: flex-start; font-size: 10px !important; }
+            .search-input-group { gap: 7px; }
+            .search-input-shell input { min-height: 44px; font-size: 15px; padding-right: 58px; }
+            .search-input-hint { display: none; }
+            .search-input-group .action-btn { min-width: 78px; padding: 9px 12px; }
+            .search-helper { flex-direction: column; gap: 2px; }
+            .shortcut-hint { display: none; }
+
+            #welcomeState { min-height: 260px; }
+            .welcome-inner { padding: 30px 12px; }
+            #welcomeState h3 { font-size: 19px; }
+
+            .mobile-result-toggle { display: inline-flex; align-self: flex-start; background: #e2e8f0; padding: 3px; border-radius: 18px; gap: 2px; margin-bottom: 10px; }
+            .dashboard-layout { flex-direction: column; gap: 12px; }
+            .dashboard-layout.mobile-data-view .map-column { display: none; }
+            .dashboard-layout.mobile-data-view .data-column { display: block; }
+            .dashboard-layout.mobile-map-view .data-column { display: none; }
+            .dashboard-layout.mobile-map-view .map-column { display: flex; height: calc(100vh - 205px); min-height: 360px; margin-bottom: 0; }
+            .data-column { padding-right: 0; }
+            .map-quick-actions { top: 8px; right: 8px; gap: 4px; padding: 3px; }
+            .map-action-btn { width: 36px; height: 36px; min-width: 36px; padding: 0; justify-content: center; font-size: 14px; }
+            .map-action-label { display: none; }
+            .map-action-icon { display: inline; }
+            #jumpToMapBtn { display: none !important; }
+
+            .result-tile .icon-copy-btn { display: none !important; opacity: .75; }
+            .result-tile .icon-copy-btn.active-copy { display: flex !important; }
+
+            .result-summary { padding: 10px 11px; }
+            .summary-action { min-height: 34px; }
+
+            .pim-card { padding: 16px 12px; }
+            .pim-primary-fields { padding: 10px; }
+            .pim-primary-note { margin-bottom: 7px; }
+            .row-2 { gap: 12px; }
+            .pim-btn { min-height: 44px; }
+            .pim-table th, .pim-table td { padding: 11px 12px; font-size: 13px; }
+        }
+
+        @media (max-width: 480px) {
+            .app-header h2 { font-size: 15px; }
+            .view-btn { padding: 6px 8px; font-size: 10px; }
+            .db-status-wrap { max-width: 38%; }
+            #dbStatus { font-size: 9px; }
+            .search-input-group .action-btn { min-width: 68px; padding-inline: 9px; }
+            .search-helper { font-size: 10px; }
+            .result-summary-actions { display: none; }
+            .example-chip { font-size: 10px; }
+            .map-action-btn { width: 34px; height: 34px; min-width: 34px; }
+        }
+
+        /* ----- USSE STYLES ----- */
+        #usseView { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .search-top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .segmented-control { display: inline-flex; background: #e2e8f0; padding: 3px; border-radius: 8px; gap: 2px; }
+        .tab-btn {
+            background: transparent; border: none; padding: 5px 12px; font-size: 12px; font-weight: 700;
+            color: var(--text-muted); border-radius: 6px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .tab-btn.active { background: var(--bg-card); color: var(--primary-dark); box-shadow: var(--shadow-sm); }
+        .tab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .search-input-group { display: flex; gap: 10px; position: relative; }
+
+        #welcomeState {
+            flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; color: var(--text-muted); background: var(--bg-card); border-radius: 12px; border: 2px dashed #cbd5e1;
+            margin-bottom: 20px; 
+        }
+        #welcomeState h3 { font-size: 22px; color: var(--primary-dark); margin-bottom: 10px; }
+
+        .dashboard-layout { display: none; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1; min-height: 0; padding-bottom: 20px; }
+        .dashboard-layout.active { display: grid; }
+        .data-column { overflow-y: auto; height: 100%; padding-right: 10px; }
+        .data-column::-webkit-scrollbar { width: 6px; }
+        .data-column::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .data-column::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        details.accordion { background: var(--bg-card); border-radius: 10px; padding: 4px 16px 16px 16px; box-shadow: var(--shadow-sm); margin-bottom: 14px; border: 1px solid var(--border-color); }
+        details.accordion summary { color: var(--primary-dark); font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 12px; }
+        details.accordion summary::-webkit-details-marker { display: none; }
+        .arrow { transition: transform 0.3s ease; font-size: 12px; color: var(--text-muted); }
+        details.accordion[open] summary .arrow { transform: rotate(180deg); }
+
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .results-grid .full-width { grid-column: span 2; }
+        .grid-3-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+        .result-tile {
+            background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px;
+            padding: 8px 12px; position: relative; min-height: 48px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;
+        }
+        .result-tile:hover { border-color: var(--accent-green); box-shadow: var(--shadow-sm); }
+        .result-tile label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; display: block; }
+        .result-value { font-size: 13.5px; font-weight: 600; color: var(--text-main); word-break: break-word; padding-right: 28px; line-height: 1.3; }
+        .result-value.empty-state { color: #94a3b8; font-weight: 500; font-style: italic; }
+
+        .icon-copy-btn {
+            position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: transparent; border: none;
+            color: var(--text-muted); cursor: pointer; padding: 5px; border-radius: 4px; display: none; align-items: center; justify-content: center; transition: all 0.2s ease;
+        }
+        .result-tile:hover .icon-copy-btn.active-copy { display: flex; }
+        .icon-copy-btn:hover { background: #e2e8f0; color: var(--primary-dark); }
+        .icon-copy-btn.copied { color: #16a34a !important; background: #dcfce7 !important; display: flex; }
+
+        .domain-block { padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 8px; display: none; }
+        .domain-block.private-bd { background: #f8fafc; border-color: #cbd5e1; }
+        .domain-block.subsidized-ha { background: var(--accent-light); border-color: var(--accent-border); }
+        .domain-title { font-size: 12px; font-weight: 800; color: var(--primary-dark); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .domain-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+        .badge-ha { background: #d1fae5; color: #065f46; }
+        .badge-bd { background: #e2e8f0; color: #334155; }
+        #noBldgDataMsg { font-size: 13px; font-weight: 600; color: var(--text-muted); text-align: center; padding: 10px; display: none; }
+
+        .map-column { height: 100%; display: flex; flex-direction: column; }
+        #mapWrapper { flex-grow: 1; width: 100%; border-radius: 10px; border: 1px solid var(--border-color); background-color: var(--bg-input); position: relative; overflow: hidden; box-shadow: var(--shadow-sm); }
+        
+        .map-quick-actions { position: absolute; top: 12px; right: 12px; z-index: 1000; display: flex; gap: 6px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); padding: 4px; border-radius: 8px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); }
+        .map-action-btn { background: #ffffff; border: 1px solid var(--border-color); color: var(--text-main); font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s ease; }
+        .map-action-btn:hover { background: var(--primary-dark); color: #ffffff; border-color: var(--primary-dark); }
+
+        #jumpToMapBtn { display: none; position: fixed; bottom: 20px; right: 20px; background-color: var(--accent-green); color: white; border-radius: 50px; padding: 12px 20px; box-shadow: var(--shadow-md); z-index: 3000; font-weight: bold; font-size: 13px; border: none; cursor: pointer; }
+
+        /* ----- PIM STYLES ----- */
+        #pimView { display: none; flex-direction: column; height: 100%; overflow-y: auto; padding-right: 10px; padding-bottom: 20px;}
+        #pimView::-webkit-scrollbar { width: 6px; }
+        #pimView::-webkit-scrollbar-track { background: transparent; }
+        #pimView::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        .pim-card { padding: 25px 30px; }
+        .section-title {
+            font-size: 13px; font-weight: 800; color: var(--primary-dark); 
+            margin-bottom: 12px; margin-top: 24px; text-transform: uppercase; 
+            border-bottom: 1px solid var(--border-color); padding-bottom: 5px;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+        
+        .row-1 { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 18px; }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+        .row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+
+        .input-wrapper { position: relative; }
+        .input-wrapper label { font-weight: 700; font-size: 12px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; display: block; }
+
+        .autocomplete-list {
+            position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--border-color);
+            border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000; max-height: 200px; overflow-y: auto; display: none; margin-top: 4px;
+        }
+        .autocomplete-list div { padding: 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f5f9; font-weight: 600;}
+        .autocomplete-list div:hover, .autocomplete-active { background-color: var(--accent-green) !important; color: white !important; }
+
+        .pim-btn { padding: 12px 24px; display: inline-flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
+        #pimSearchBtn { background-color: var(--primary-dark); flex: 3; }
+        #pimSearchBtn:hover { background-color: var(--accent-green); }
+        #pimSearchBtn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+        #pimResetBtn { background-color: #64748b; flex: 1; }
+        #pimResetBtn:hover { background-color: #475569; }
+
+        #resultsWarning { font-size: 13px; font-weight: 700; margin-bottom: 15px; padding: 12px; border-radius: 8px; display: none; }
+        .warning-red { background-color: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
+        .warning-green { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+
+        .pim-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: white; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);}
+        .pim-table th, .pim-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .pim-table th { background-color: #f8fafc; color: var(--text-muted); font-weight: 800; font-size: 12px; text-transform: uppercase; position: sticky; top: 0;}
+        .pim-table tr:last-child td { border-bottom: none; }
+        .pim-table tr:hover td { background-color: #f1f5f9; }
+        
+        .prn-link { color: var(--primary-dark); font-weight: 900; text-decoration: underline; cursor: pointer; transition: color 0.2s ease;}
+        .prn-link:hover { color: var(--accent-green); }
+        
+        .pim-icon-copy-btn { 
+            background: transparent; border: none; color: var(--text-muted); cursor: pointer; 
+            padding: 5px; border-radius: 4px; display: inline-flex; align-items: center; 
+            justify-content: center; transition: all 0.2s ease; vertical-align: middle; margin-left: 8px; 
+        }
+        .pim-icon-copy-btn:hover { background: #e2e8f0; color: var(--primary-dark); }
+        .pim-icon-copy-btn.copied { color: #16a34a !important; background: #dcfce7 !important; }
+
+        @media (max-width: 992px) {
+            html, body { height: auto; overflow-y: auto; overflow-x: hidden; }
+            .app-container { height: auto; max-width: 100vw; padding: 10px; }
+            .header-title-area { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .dashboard-layout { display: none; flex-direction: column; }
+            .dashboard-layout.active { display: flex; }
+            .data-column { overflow-y: visible; height: auto; padding-right: 0; }
+            .map-column { height: 450px; margin-bottom: 50px; }
+            .search-card { position: sticky; top: 0; z-index: 2000; }
+            .row-2, .row-4 { grid-template-columns: 1fr; gap: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+    <div class="loading-card">
+        <div class="loading-title">Universal Spatial Search Engine</div>
+        <div class="progress-bar-container">
+            <div id="loadingBar" class="progress-bar"></div>
+        </div>
+        <div id="loadingText">Initializing System...</div>
+    </div>
+</div>
+
+<div class="app-container">
+    <div class="app-header">
+        <div class="header-title-area">
+            <div class="app-brand">
+                <img class="app-logo" src="favicon.png" alt="USSE">
+                <div class="header-copy">
+                    <h2>Universal Spatial Search Engine</h2>
+                    <div class="header-subtitle">Hong Kong property, address &amp; spatial lookup</div>
+                </div>
+            </div>
+            <!-- View Toggle -->
+            <div class="view-toggle">
+                <button class="view-btn active" id="btnViewUSSE" onclick="switchAppView('USSE')">Spatial Engine</button>
+                <button class="view-btn" id="btnViewPIM" onclick="switchAppView('PIM')">PRN Finder</button>
+            </div>
+        </div>
+        <div class="db-status-wrap">
+            <div id="dbStatus" class="status">Connecting to Database...</div>
+            <div class="db-status-caption">Local-first database</div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: UNIVERSAL SPATIAL SEARCH ENGINE    -->
+    <!-- ========================================== -->
+    <div id="usseView">
+        <div class="card search-card" id="searchContainer">
+            <div class="search-top-bar">
+                <span class="search-mode-label">Search by</span>
+                <div class="segmented-control">
+                    <button class="tab-btn active" id="tabAUTO" onclick="setManualMode('AUTO')">Auto-Detect</button>
+                    <button class="tab-btn" id="tabPRN" onclick="setManualMode('PRN')">PRN</button>
+                    <button class="tab-btn" id="tabADDR" onclick="setManualMode('ADDR')">Address / GeoCode</button>
+                    <button class="tab-btn" id="tabBLDG" onclick="setManualMode('BLDG')">Block ID</button>
+                    <button class="tab-btn" id="tabOP" onclick="setManualMode('OP')">OP No.</button>
+                </div>
+                <span id="detectedTypeBadge" style="font-size: 11px; font-weight: 800; color: var(--accent-green);">Mode: Auto-Detect</span>
+            </div>
+
+            <div class="search-input-group">
+                <div class="search-input-shell">
+                    <input type="text" id="unifiedSearchInput" placeholder="Search PRN, address, BuildingCSUID, Block ID or OP No." disabled oninput="handleAutoDetect()" aria-label="Spatial search">
+                    <span class="search-input-hint">Enter</span>
+                </div>
+                <button class="action-btn" id="unifiedSearchBtn" disabled onclick="executeUnifiedSearch()">
+                    <span class="spinner" id="searchSpinner"></span>
+                    <span id="searchBtnText">Search</span>
+                </button>
+            </div>
+            <div class="search-helper">
+                <span>Auto-Detect recognises PRN, GeoAddress Code, Block ID, OP No. and address text.</span>
+                <span class="shortcut-hint">Ctrl / Cmd + K&nbsp; · &nbsp;Enter to search</span>
+            </div>
+        </div>
+
+        <div id="welcomeState">
+            <div class="welcome-inner">
+                <div class="welcome-kicker">Lightning-fast local search</div>
+                <h3>Search Hong Kong property data</h3>
+                <p>Type any identifier or address. The engine will detect the input type automatically, or you can choose a search mode above.</p>
+                <div class="example-row">
+                    <span class="example-chip">Melody Garden</span>
+                    <span class="example-chip">Nathan Road</span>
+                    <span class="example-chip"><code>PRN&nbsp;A1234567</code></span>
+                    <span class="example-chip">BuildingCSUID</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mobile-result-toggle" id="mobileResultToggle" aria-label="Result view">
+            <button class="mobile-result-btn active" id="mobileDataBtn" onclick="setMobileResultView('data')">Data</button>
+            <button class="mobile-result-btn" id="mobileMapBtn" onclick="setMobileResultView('map')">Map</button>
+        </div>
+
+        <div class="dashboard-layout mobile-data-view" id="resultsContainer">
+            <div class="data-column">
+                <div class="result-summary" id="resultSummary">
+                    <div class="result-summary-icon">✓</div>
+                    <div>
+                        <div class="result-summary-title" id="resultSummaryTitle">Search results ready</div>
+                        <div class="result-summary-text" id="resultSummaryText">--</div>
+                    </div>
+                    <div class="result-summary-actions">
+                        <button class="summary-action" onclick="viewResultMap()">View map</button>
+                    </div>
+                </div>
+                <!-- ACCORDION 1: ADDRESS -->
+                <details class="accordion" open>
+                    <summary>Address Data <span class="arrow">▼</span></summary>
+                    <div class="results-grid" id="addressGrid">
+                        <div class="full-width"><div class="result-tile primary-result-tile"><label>Land Registry Address</label><div class="result-value" id="lrAddressText">--</div><button class="icon-copy-btn" onclick="copyText('lrAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile"><label>English Address (ALS)</label><div class="result-value" id="engAddressText">--</div><button class="icon-copy-btn" onclick="copyText('engAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile"><label>Chinese Address (ALS)</label><div class="result-value" id="chiAddressText">--</div><button class="icon-copy-btn" onclick="copyText('chiAddressText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>Building Name (Eng)</label><div class="result-value" id="bldgEngText">--</div><button class="icon-copy-btn" onclick="copyText('bldgEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>Building Name (Chi)</label><div class="result-value" id="bldgChiText">--</div><button class="icon-copy-btn" onclick="copyText('bldgChiText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>Estate Name (Eng)</label><div class="result-value" id="estateEngText">--</div><button class="icon-copy-btn" onclick="copyText('estateEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>Estate Name (Chi)</label><div class="result-value" id="estateChiText">--</div><button class="icon-copy-btn" onclick="copyText('estateChiText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>District (Eng)</label><div class="result-value" id="distEngText">--</div><button class="icon-copy-btn" onclick="copyText('distEngText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>District (Chi)</label><div class="result-value" id="distChiText">--</div><button class="icon-copy-btn" onclick="copyText('distChiText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div id="dynamicStreetsGrid" class="full-width" style="display: contents;"></div>
+                    </div>
+                </details>
+
+                <!-- ACCORDION 2: BUILDING DETAILS -->
+                <details class="accordion" open>
+                    <summary>Building Details <span class="arrow">▼</span></summary>
+                    <div id="noBldgDataMsg">No specific building records found.</div>
+                    
+                    <div class="domain-block private-bd" id="bdDomainBlock">
+                        <div class="domain-title"><span>Private Building (Buildings Dept)</span><span class="domain-badge badge-bd">BD / BO</span></div>
+                        <div class="grid-3-col">
+                            <div class="result-tile"><label>OP No.</label><div class="result-value" id="opNoText">--</div><button class="icon-copy-btn" onclick="copyText('opNoText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>OP Date</label><div class="result-value" id="opDateText">--</div><button class="icon-copy-btn" onclick="copyText('opDateText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>Age</label><div class="result-value" id="ageText">--</div><button class="icon-copy-btn" onclick="copyText('ageText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                        </div>
+                        <div class="result-tile" style="margin-top: 12px;"><label>Permitted Use</label><div class="result-value" id="permittedUseText">--</div><button class="icon-copy-btn" onclick="copyText('permittedUseText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                    </div>
+
+                    <div class="domain-block subsidized-ha" id="haDomainBlock">
+                        <div class="domain-title"><span>Subsidized Housing (Housing Authority)</span><span class="domain-badge badge-ha">HA Record</span></div>
+                        <div class="results-grid">
+                            <div class="result-tile"><label>Housing Type / HOS Phase No.</label><div class="result-value" id="subHousingTypeText">--</div><button class="icon-copy-btn" onclick="copyText('subHousingTypeText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>Block Type</label><div class="result-value" id="blockTypeText">--</div><button class="icon-copy-btn" onclick="copyText('blockTypeText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>Intake Year</label><div class="result-value" id="yearCompText">--</div><button class="icon-copy-btn" onclick="copyText('yearCompText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                            <div class="result-tile"><label>Age (HA)</label><div class="result-value" id="haAgeText">--</div><button class="icon-copy-btn" onclick="copyText('haAgeText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- ACCORDION 3: CSDI -->
+                <details class="accordion" open>
+                    <summary>CSDI Information <span class="arrow">▼</span></summary>
+                    <div class="results-grid">
+                        <div><div class="result-tile"><label>BuildingCSUID (GeoAddress Code)</label><div class="result-value" id="csuidText">--</div><button class="icon-copy-btn" onclick="copyText('csuidText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>BuildingStructureID (Block ID)</label><div class="result-value" id="structureIdText">--</div><button class="icon-copy-btn" onclick="copyText('structureIdText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div class="full-width"><div class="result-tile"><label>Lot Number (Only for PRN-search)</label><div class="result-value" id="lotNumText">--</div><button class="icon-copy-btn" onclick="copyText('lotNumText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>Easting (HK1980 Grid)</label><div class="result-value" id="eastingText">--</div><button class="icon-copy-btn" onclick="copyText('eastingText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                        <div><div class="result-tile"><label>Northing (HK1980 Grid)</label><div class="result-value" id="northingText">--</div><button class="icon-copy-btn" onclick="copyText('northingText', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>
+                    </div>
+                </details>
+            </div>
+            
+            <div class="map-column" id="mapSection">
+                <div id="mapWrapper">
+                    <div class="map-quick-actions">
+                        <button class="map-action-btn" id="mapLangBtn" onclick="toggleMapLang()" aria-label="Switch map labels"><span class="map-action-icon">🈯</span><span class="map-action-label"> 中 / EN</span></button>
+                        <button class="map-action-btn" onclick="recenterMap()" aria-label="Recenter map"><span class="map-action-icon">🎯</span><span class="map-action-label"> Recenter</span></button>
+                        <button class="map-action-btn" onclick="openGoogleMaps()" aria-label="Open Google Maps"><span class="map-action-icon">📍</span><span class="map-action-label"> Google Maps</span></button>
+                        <button class="map-action-btn" onclick="copyCoords()" aria-label="Copy coordinates"><span class="map-action-icon">📋</span><span class="map-action-label"> Copy Coords</span></button>
+                    </div>
+                    <div id="mapContainer" style="height: 100%; width: 100%; z-index: 1;"></div>
+                    <div id="mapPlaceholder" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #888888; background: #f8fafc; z-index: 1000; font-weight: bold;">Map will appear here</div>
+                </div>
+            </div>
+        </div>
+        <button id="jumpToMapBtn" onclick="document.getElementById('mapSection').scrollIntoView({behavior: 'smooth'})">🗺️ Map View</button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: PRN IDENTIFICATION MODULE (PIM)    -->
+    <!-- ========================================== -->
+    <div id="pimView">
+        <div class="card pim-card">
+            <!-- 1. Macro Location -->
+            <div class="section-title">1. Macro Location</div>
+            <div class="row-1">
+                <div class="input-wrapper">
+                    <label>District</label>
+                    <input type="text" class="pim-input" id="inpDistrict" placeholder="e.g. Hong Kong / Sha Tin" disabled autocomplete="off">
+                    <div id="suggestDistrict" class="autocomplete-list"></div>
+                </div>
+            </div>
+
+            <!-- 2. Core Search -->
+            <div class="section-title">2. Core Search</div>
+            <div class="pim-primary-fields">
+                <div class="pim-primary-note">Use any combination of these primary search fields. Free Format is useful when the address wording is uncertain.</div>
+                <div class="row-2" style="margin-bottom: 12px;">
+                    <div class="input-wrapper">
+                        <label>Building / Estate Name</label>
+                        <input type="text" class="pim-input" id="inpDev" placeholder="e.g. Melody Garden / Le Prime" disabled autocomplete="off">
+                        <div id="suggestDev" class="autocomplete-list"></div>
+                    </div>
+                    <div class="input-wrapper">
+                        <label>Street Name</label>
+                        <input type="text" class="pim-input" id="inpStreet" placeholder="e.g. Nathan Road" disabled autocomplete="off">
+                        <div id="suggestStreet" class="autocomplete-list"></div>
+                    </div>
+                </div>
+                <div class="row-1" style="margin-bottom: 0;">
+                    <div class="input-wrapper">
+                        <label>Free Format Search</label>
+                        <input type="text" class="pim-input" id="inpFreeFormat" placeholder="e.g. Shin Lun House / 12 Tai Po Road" disabled autocomplete="off">
+                        <small style="color: #64748b; margin-top: 6px; display: block; font-weight: 500;">Search any keywords contained in the Land Registry free-format address.</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Micro Details -->
+            <div class="section-title">3. Micro Details</div>
+            <div class="row-4">
+                <div class="input-wrapper">
+                    <label>Street No.</label>
+                    <input type="text" class="pim-input" id="inpStreetNo" placeholder="e.g. 17 (do not input range)" disabled>
+                </div>
+                <div class="input-wrapper">
+                    <label>Block</label>
+                    <input type="text" class="pim-input" id="inpBlock" placeholder="e.g. A / 5" disabled>
+                </div>
+                <div class="input-wrapper">
+                    <label>Floor</label>
+                    <input type="text" class="pim-input" id="inpFloor" placeholder="e.g. 10" disabled>
+                </div>
+                <div class="input-wrapper">
+                    <label>Flat / Room</label>
+                    <input type="text" class="pim-input" id="inpFlat" placeholder="e.g. C /1" disabled>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-top: 25px;">
+                <button class="action-btn pim-btn" id="pimSearchBtn" disabled onclick="executePIMSearch()">
+                    <span class="spinner" id="pimSearchSpinner"></span>
+                    <span id="pimSearchBtnText">Identify PRN</span>
+                </button>
+                <button class="action-btn pim-btn" id="pimResetBtn" onclick="resetPIMForm()">Reset</button>
+            </div>
+        </div>
+
+        <div class="card pim-card" id="pimResultsCard" style="display: none;">
+            <div class="pim-results-heading">
+                <h3>Search Results</h3>
+                <div class="pim-results-subtitle" id="pimResultsSummary">--</div>
+            </div>
+            <div id="resultsWarning"></div>
+            <div style="overflow-x: auto; max-height: 500px;">
+                <table class="pim-table">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 140px;">PRN</th>
+                            <th>English Address</th>
+                            <th>Chinese Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody">
+                        <!-- Results populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const dummyNumbers = ["1111", "2222", "3333", "4444", "5555", "6666", "7777", "8888", "9999"];
+    let SQL, activeDB = null, localStore;
+    
+    // Base Map Config
+    proj4.defs("EPSG:2326", "+proj=tmerc +lat_0=22.31213333333334 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,0.067753,-2.24365,-1.15883,-1.09425 +units=m +no_defs");
+    let miniMap = null, mapMarker = null, labelLayerEng = null, labelLayerChi = null;
+    let currentMapLang = 'en', currentLat = null, currentLng = null;
+    let currentSearchMode = 'AUTO'; 
+
+    const resultFields = [
+        'lrAddressText', 'engAddressText', 'chiAddressText', 'bldgEngText', 'bldgChiText', 'estateEngText', 'estateChiText',
+        'distEngText', 'distChiText', 'csuidText', 'structureIdText', 'lotNumText', 'eastingText', 'northingText', 
+        'opNoText', 'opDateText', 'permittedUseText', 'ageText', 'subHousingTypeText', 'yearCompText', 'blockTypeText', 'haAgeText'
+    ];
+
+    // ==========================================
+    // SPA VIEW CONTROLLER & HAND-OFF LOGIC
+    // ==========================================
+    function switchAppView(viewName) {
+        document.getElementById('btnViewUSSE').classList.remove('active');
+        document.getElementById('btnViewPIM').classList.remove('active');
+        document.getElementById('btnView' + viewName).classList.add('active');
+
+        const usseView = document.getElementById('usseView');
+        const pimView = document.getElementById('pimView');
+
+        usseView.classList.remove('view-animate-left', 'view-animate-right');
+        pimView.classList.remove('view-animate-left', 'view-animate-right');
+        void usseView.offsetWidth; 
+        void pimView.offsetWidth;
+
+        if (viewName === 'USSE') {
+            pimView.style.display = 'none';
+            usseView.style.display = 'flex';
+            usseView.classList.add('view-animate-left'); 
+            if (miniMap) setTimeout(() => { miniMap.invalidateSize(); }, 200);
+        } else {
+            usseView.style.display = 'none';
+            pimView.style.display = 'flex';
+            pimView.classList.add('view-animate-right'); 
+        }
+    }
+
+    function launchUsseSearch(prnCode) {
+        switchAppView('USSE'); 
+        setManualMode('PRN'); 
+        document.getElementById('unifiedSearchInput').value = prnCode; 
+        document.getElementById('unifiedSearchBtn').click(); 
+    }
+
+    // ==========================================
+    // DATABASE INITIALIZATION & LOADING ENGINE
+    // ==========================================
+    function updateLoadingProgress(percent, text) {
+        const bar = document.getElementById('loadingBar');
+        const txt = document.getElementById('loadingText');
+        const status = document.getElementById('dbStatus');
+        if (bar) bar.style.width = percent + '%';
+        if (txt) txt.textContent = text;
+        if (status) status.textContent = text;
+    }
+
+    const DB_STORAGE_NAME = "PRN_App_Storage";
+    const DB_STORE_NAME = "files";
+    const DB_CACHE_ID = "masterDB";
+    const DB_MANIFEST_URL = "database-manifest.json";
+    const AUTOCOMPLETE_URL = "autocomplete_dict.json";
+    const DB_R2_URL = "https://pub-7de3fa8b78e54f57a851057cf025b57c.r2.dev/PRN_Data.db.gz";
+
+    // iPhone/iPad beta backend: streamed SQLite import into OPFS, queried by a Worker.
+    // This avoids materializing the ~736 MB SQLite file in the Safari UI/WASM heap.
+    const MOBILE_BETA_META_KEY = "usseMobileBetaDbVersion";
+    const MOBILE_BETA_WORKER_URL = "sqlite-mobile-worker.js";
+    let mobileSQLiteWorker = null;
+    let mobileSQLiteReady = false;
+
+    function loadDesktopSqlJs() {
+        return new Promise((resolve, reject) => {
+            if (typeof initSqlJs === "function") {
+                resolve();
+                return;
+            }
+            const script = document.createElement("script");
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js";
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("SQLite engine failed to load."));
+            document.head.appendChild(script);
+        });
+    }
+    let mobileSQLiteRequestId = 0;
+    const mobileSQLitePending = new Map();
+
+    function isAppleTouchDevice() {
+        const ua = navigator.userAgent || "";
+        return /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    }
+
+    function databaseIsReady() {
+        return mobileSQLiteReady || !!activeDB;
+    }
+
+    function mobileWorkerCall(type, payload = {}) {
+        return new Promise((resolve, reject) => {
+            if (!mobileSQLiteWorker) {
+                reject(new Error("Mobile SQLite worker is not initialized."));
+                return;
+            }
+            const id = ++mobileSQLiteRequestId;
+            mobileSQLitePending.set(id, { resolve, reject });
+            mobileSQLiteWorker.postMessage({ id, type, ...payload });
+        });
+    }
+
+    function setupMobileSQLiteWorker() {
+        return new Promise((resolve, reject) => {
+            try {
+                const worker = new Worker(MOBILE_BETA_WORKER_URL, { type: "module" });
+                mobileSQLiteWorker = worker;
+                worker.onmessage = (event) => {
+                    const msg = event.data || {};
+                    if (msg.type === "progress") {
+                        updateLoadingProgress(Number(msg.percent) || 0, msg.text || "Loading mobile database...");
+                        return;
+                    }
+                    if (msg.type === "fatal") {
+                        const pending = mobileSQLitePending.get(msg.id);
+                        if (pending) {
+                            mobileSQLitePending.delete(msg.id);
+                            pending.reject(new Error(msg.error || "Mobile SQLite worker failed."));
+                        }
+                        return;
+                    }
+                    if (!msg.id) return;
+                    const pending = mobileSQLitePending.get(msg.id);
+                    if (!pending) return;
+                    mobileSQLitePending.delete(msg.id);
+                    if (msg.ok) pending.resolve(msg.result);
+                    else pending.reject(new Error(msg.error || "Mobile SQLite operation failed."));
+                };
+                worker.onerror = (event) => {
+                    const message = event?.message || "Mobile SQLite worker crashed.";
+                    for (const { reject: rejectPending } of mobileSQLitePending.values()) rejectPending(new Error(message));
+                    mobileSQLitePending.clear();
+                    reject(new Error(message));
+                };
+                resolve(worker);
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    async function initializeMobileSQLite(manifest) {
+        updateLoadingProgress(20, "Starting mobile SQLite engine...");
+        await setupMobileSQLiteWorker();
+
+        const version = manifest?.database?.sha256 || "";
+        const expectedRawBytes = Number(manifest?.database?.rawBytes) || 0;
+        const rowCount = Number(manifest?.rowCount) || 0;
+        const cachedVersion = localStorage.getItem(MOBILE_BETA_META_KEY) || "";
+
+        const result = await mobileWorkerCall("open", {
+            dbUrl: DB_R2_URL,
+            dbPath: "/PRN_Data.db",
+            expectedRawBytes,
+            expectedRowCount: rowCount,
+            expectedVersion: version,
+            cachedVersion
+        });
+
+        mobileSQLiteReady = true;
+        if (version) localStorage.setItem(MOBILE_BETA_META_KEY, version);
+
+        const records = rowCount ? ` · ${rowCount.toLocaleString()} records` : "";
+        const fromCache = result?.fromCache === true;
+        const versionText = result?.version ? ` [DB ver.: ${String(result.version).slice(0, 8)}]` : "";
+        document.getElementById("dbStatus").className = "status success";
+        document.getElementById("dbStatus").textContent = fromCache
+            ? `⚡ Ready · iPhone local database${versionText}${records}`
+            : `⚡ Ready · iPhone database cached${versionText}${records}`;
+
+        updateLoadingProgress(100, "System Ready!");
+        return result;
+    }
+
+    async function queryAddressDatabase(sql, params = []) {
+        if (mobileSQLiteReady) {
+            return await mobileWorkerCall("query", { sql, params });
+        }
+
+        if (!activeDB) throw new Error("Database is not ready.");
+        const stmt = activeDB.prepare(sql);
+        try {
+            stmt.bind(params);
+            const rows = [];
+            while (stmt.step()) rows.push(stmt.getAsObject());
+            return rows;
+        } finally {
+            stmt.free();
+        }
+    }
+
+    let currentManifest = null;
+    let dbInitStarted = false;
+    let autocompleteInitialized = false;
+    let pimEnterInitialized = false;
+
+    function ensureFilesStore(db) {
+        if (!db.objectStoreNames.contains(DB_STORE_NAME)) {
+            db.createObjectStore(DB_STORE_NAME, { keyPath: "id" });
+        }
+    }
+
+    function openLocalDatabase() {
+        return new Promise((resolve, reject) => {
+            // Do not pass a hard-coded version here. Older USSE builds may have
+            // already created PRN_App_Storage at a higher version (for example v3).
+            // Asking IndexedDB to open that database at v1 throws VersionError.
+            const req = indexedDB.open(DB_STORAGE_NAME);
+
+            req.onupgradeneeded = function(e) {
+                ensureFilesStore(e.target.result);
+            };
+
+            req.onsuccess = () => {
+                const db = req.result;
+                db.onversionchange = () => db.close();
+
+                // A legacy database at a higher version may not have the cache
+                // store. Upgrade it by exactly one version rather than attempting
+                // to downgrade it.
+                if (db.objectStoreNames.contains(DB_STORE_NAME)) {
+                    resolve(db);
+                    return;
+                }
+
+                const nextVersion = db.version + 1;
+                db.close();
+                const upgradeReq = indexedDB.open(DB_STORAGE_NAME, nextVersion);
+
+                upgradeReq.onupgradeneeded = function(e) {
+                    ensureFilesStore(e.target.result);
+                };
+                upgradeReq.onsuccess = () => {
+                    const upgradedDb = upgradeReq.result;
+                    upgradedDb.onversionchange = () => upgradedDb.close();
+                    resolve(upgradedDb);
+                };
+                upgradeReq.onerror = () => reject(upgradeReq.error || new Error("IndexedDB migration failed."));
+                upgradeReq.onblocked = () => reject(new Error("IndexedDB migration is blocked by another tab or browser process."));
+            };
+
+            req.onerror = () => reject(req.error || new Error("IndexedDB could not be opened."));
+            req.onblocked = () => reject(new Error("IndexedDB is blocked by another tab or browser process."));
+        });
+    }
+
+    async function fetchDatabaseManifest() {
+        try {
+            const response = await fetch(DB_MANIFEST_URL, {
+                cache: "no-store",
+                headers: { "Accept": "application/json" }
+            });
+            if (!response.ok) throw new Error(`Manifest HTTP ${response.status}`);
+            const manifest = await response.json();
+
+            if (!manifest || !manifest.database || !manifest.database.file) {
+                throw new Error("database-manifest.json is missing required database metadata.");
+            }
+
+            return manifest;
+        } catch (err) {
+            console.warn("Database manifest unavailable; continuing with cache/R2 fallback.", err);
+            return null;
+        }
+    }
+
+    async function fetchAutocompleteDictionary(manifest) {
+        try {
+            let dictUrl = AUTOCOMPLETE_URL;
+            const dictHash = manifest?.autocomplete?.sha256;
+            if (dictHash) dictUrl += `?v=${encodeURIComponent(dictHash)}`;
+
+            const response = await fetch(dictUrl, {
+                cache: "force-cache",
+                headers: { "Accept": "application/json" }
+            });
+            if (!response.ok) throw new Error(`Autocomplete dictionary HTTP ${response.status}`);
+
+            const dictionary = await response.json();
+            if (!dictionary || typeof dictionary !== "object") {
+                throw new Error("Autocomplete dictionary is not a JSON object.");
+            }
+
+            window.pimDictionary = dictionary;
+            return true;
+        } catch (err) {
+            console.warn("Autocomplete dictionary unavailable.", err);
+            window.pimDictionary = null;
+            return false;
+        }
+    }
+
+    function readCachedDatabase() {
+        return new Promise((resolve, reject) => {
+            if (!localStore) {
+                resolve(null);
+                return;
+            }
+
+            let tx;
+            try {
+                tx = localStore.transaction([DB_STORE_NAME], "readonly");
+            } catch (err) {
+                reject(err);
+                return;
+            }
+
+            const req = tx.objectStore(DB_STORE_NAME).get(DB_CACHE_ID);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error || new Error("Unable to read the local database cache."));
+        });
+    }
+
+    function deleteCachedDatabase() {
+        return new Promise((resolve) => {
+            if (!localStore) {
+                resolve();
+                return;
+            }
+
+            try {
+                const tx = localStore.transaction([DB_STORE_NAME], "readwrite");
+                tx.objectStore(DB_STORE_NAME).delete(DB_CACHE_ID);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+                tx.onabort = () => resolve();
+            } catch (err) {
+                resolve();
+            }
+        });
+    }
+
+    function saveCachedDatabase(binary, cacheVersion) {
+        return new Promise((resolve, reject) => {
+            if (!localStore) {
+                resolve(false);
+                return;
+            }
+
+            let tx;
+            try {
+                tx = localStore.transaction([DB_STORE_NAME], "readwrite");
+                tx.objectStore(DB_STORE_NAME).put({
+                    id: DB_CACHE_ID,
+                    data: binary.buffer,
+                    version: cacheVersion || null,
+                    rawBytes: binary.byteLength,
+                    cachedAtUtc: new Date().toISOString()
+                });
+
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => reject(tx.error || new Error("Local database cache write failed."));
+                tx.onabort = () => reject(tx.error || new Error("Local database cache write was aborted."));
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    function getExpectedRawBytes(manifest) {
+        const value = Number(manifest?.database?.rawBytes);
+        return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    function getManifestVersion(manifest) {
+        // database.sha256 is the SHA-256 of the uploaded R2 .db.gz asset.
+        // Use the asset hash as the cache identity; rawSha256 is optional for
+        // manifests that also publish the decompressed SQLite hash.
+        return manifest?.database?.sha256 || null;
+    }
+
+    function isCacheUsable(cached, manifest) {
+        if (!cached || !cached.data) return false;
+
+        const expectedBytes = getExpectedRawBytes(manifest);
+        const cachedBytes = Number(cached.rawBytes || (cached.data.byteLength ?? cached.data.length) || 0);
+
+        if (manifest) {
+            const expectedVersion = getManifestVersion(manifest);
+            if (expectedVersion && cached.version && cached.version !== expectedVersion) return false;
+
+            if (expectedVersion && !cached.version) {
+                // Do not trust an unversioned legacy cache against a new manifest.
+                // A same-day rebuild can have identical size but different contents.
+                return false;
+            }
+
+            if (expectedBytes && cachedBytes !== expectedBytes) return false;
+        }
+
+        return cachedBytes > 0;
+    }
+
+    function normalizeBinary(data) {
+        if (data instanceof Uint8Array) return data;
+        if (data instanceof ArrayBuffer) return new Uint8Array(data);
+        if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        throw new Error("Cached database payload is not a valid binary buffer.");
+    }
+
+    async function decodeDatabasePayload(response, manifest) {
+        const payload = new Uint8Array(await response.arrayBuffer());
+        if (!payload.length) throw new Error("Cloudflare returned an empty database payload.");
+
+        const isGzip = payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b;
+
+        // database.sha256 is the SHA-256 of the uploaded .db.gz object. Verify it
+        // when fetch() exposes the gzip bytes. If R2/browser transparently decodes
+        // the transport, the response body is already SQLite and the compressed hash
+        // is not available from that response.
+        const expectedCompressedSha = manifest?.database?.sha256;
+        const expectedCompressedBytes = Number(manifest?.database?.compressedBytes);
+        if (isGzip) {
+            if (Number.isFinite(expectedCompressedBytes) && expectedCompressedBytes > 0 && payload.byteLength !== expectedCompressedBytes) {
+                throw new Error(`Database compressed-size mismatch: expected ${expectedCompressedBytes.toLocaleString()} bytes, received ${payload.byteLength.toLocaleString()} bytes.`);
+            }
+            if (expectedCompressedSha && window.crypto?.subtle) {
+                const digest = await crypto.subtle.digest("SHA-256", payload);
+                const actualCompressedSha = Array.from(new Uint8Array(digest))
+                    .map(b => b.toString(16).padStart(2, "0"))
+                    .join("");
+                if (actualCompressedSha.toLowerCase() !== String(expectedCompressedSha).toLowerCase()) {
+                    throw new Error(`Database SHA-256 mismatch: expected ${expectedCompressedSha}, received ${actualCompressedSha}.`);
+                }
+            }
+        }
+
+        let binary;
+        if (isGzip) {
+            if (typeof DecompressionStream === "undefined") {
+                throw new Error("This browser does not support gzip decompression required for the database.");
+            }
+
+            try {
+                const ds = new DecompressionStream("gzip");
+                const stream = new Response(payload).body.pipeThrough(ds);
+                binary = new Uint8Array(await new Response(stream).arrayBuffer());
+            } catch (err) {
+                throw new Error(`Database gzip decompression failed: ${err.message || err}`);
+            }
+        } else {
+            binary = payload;
+        }
+
+        const expectedBytes = getExpectedRawBytes(manifest);
+        if (expectedBytes && binary.byteLength !== expectedBytes) {
+            throw new Error(`Database size mismatch: expected ${expectedBytes.toLocaleString()} bytes, received ${binary.byteLength.toLocaleString()} bytes.`);
+        }
+
+        // Optional future-proof integrity check for the final SQLite bytes.
+        // Current manifest v2 publishes database.sha256 for the .db.gz asset.
+        const expectedRawSha = manifest?.database?.rawSha256;
+        if (expectedRawSha && window.crypto?.subtle) {
+            const digest = await crypto.subtle.digest("SHA-256", binary);
+            const actualRawSha = Array.from(new Uint8Array(digest))
+                .map(b => b.toString(16).padStart(2, "0"))
+                .join("");
+            if (actualRawSha.toLowerCase() !== String(expectedRawSha).toLowerCase()) {
+                throw new Error(`Database raw SHA-256 mismatch: expected ${expectedRawSha}, received ${actualRawSha}.`);
+            }
+        }
+
+        return binary;
+    }
+
+    async function downloadAndCachePayload(manifest) {
+        updateLoadingProgress(30, "Downloading database from Cloudflare...");
+
+        const response = await fetch(DB_R2_URL, {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error(`Database download failed with HTTP ${response.status}.`);
+        }
+
+        updateLoadingProgress(60, "Decompressing database...");
+        const finalBinary = await decodeDatabasePayload(response, manifest);
+
+        const cacheVersion = getManifestVersion(manifest) || `r2:${DB_R2_URL}`;
+        updateLoadingProgress(85, "Caching database to local storage...");
+
+        let cacheSaved = false;
+        try {
+            cacheSaved = await saveCachedDatabase(finalBinary, cacheVersion);
+        } catch (cacheErr) {
+            console.warn("Database cache write failed; continuing in memory.", cacheErr);
+        }
+
+        return { binary: finalBinary, fromCache: false, cacheSaved, version: cacheVersion };
+    }
+
+    async function loadDatabaseFromCacheOrNetwork(manifest) {
+        let cached = null;
+
+        try {
+            cached = await readCachedDatabase();
+        } catch (cacheErr) {
+            console.warn("Local cache read failed; attempting network.", cacheErr);
+        }
+
+        if (isCacheUsable(cached, manifest)) {
+            try {
+                updateLoadingProgress(50, "Loading database from local cache...");
+                const cachedVersion = cached.version || getManifestVersion(manifest) || "";
+                if (!cached.version && manifest && cachedVersion) {
+                    localStorage.setItem("cachedDbVersion", cachedVersion);
+                }
+                return { binary: normalizeBinary(cached.data), fromCache: true, cacheSaved: true, version: cachedVersion };
+            } catch (cacheErr) {
+                console.warn("Cached database payload is unusable; rebuilding cache.", cacheErr);
+                await deleteCachedDatabase();
+            }
+        }
+
+        return await downloadAndCachePayload(manifest);
+    }
+
+    function loadDatabaseIntoMemory(uInt8Array, dbVersion, cacheInfo) {
+        updateLoadingProgress(90, "Initializing Spatial Engine...");
+
+        setTimeout(() => {
+            try {
+                activeDB = new SQL.Database(uInt8Array);
+
+                let formattedVersion = currentManifest?.builtAtUtc || "";
+                if (formattedVersion) {
+                    const dateMatch = String(formattedVersion).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (dateMatch) formattedVersion = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+                } else if (dbVersion && dbVersion !== "fallback_trigger") {
+                    const match = String(dbVersion).match(/^(\d{4})(\d{2})(\d{2})/);
+                    if (match) formattedVersion = `${match[1]}-${match[2]}-${match[3]}`;
+                    else formattedVersion = "";
+                }
+
+                let versionDisplay = (formattedVersion && formattedVersion !== "fallback_trigger")
+                    ? ` [DB ver.: ${formattedVersion}]`
+                    : "";
+
+                updateLoadingProgress(100, `System Ready!${versionDisplay}`);
+                document.getElementById("dbStatus").className = "status success";
+
+                document.getElementById("unifiedSearchInput").disabled = false;
+                document.getElementById("unifiedSearchBtn").disabled = false;
+                document.querySelectorAll(".pim-input").forEach(el => el.disabled = false);
+                document.getElementById("pimSearchBtn").disabled = false;
+
+                if (!autocompleteInitialized && window.pimDictionary) {
+                    setupAutocomplete();
+                    autocompleteInitialized = true;
+                }
+                if (!pimEnterInitialized) {
+                    setupEnterToSearchPIM();
+                    pimEnterInitialized = true;
+                }
+
+                const statusEl = document.getElementById("dbStatus");
+                const recordNote = Number.isFinite(Number(currentManifest?.rowCount))
+                    ? ` · ${Number(currentManifest.rowCount).toLocaleString()} records`
+                    : "";
+                if (cacheInfo && cacheInfo.fromCache) {
+                    statusEl.textContent = `⚡ Ready · Local cache${versionDisplay}${recordNote}`;
+                } else if (cacheInfo && cacheInfo.cacheSaved === false) {
+                    statusEl.textContent = `⚡ Ready · Session only${versionDisplay}${recordNote}`;
+                } else {
+                    statusEl.textContent = `⚡ Ready · Cached locally${versionDisplay}${recordNote}`;
+                }
+
+                setTimeout(() => {
+                    const overlay = document.getElementById("loadingOverlay");
+                    overlay.style.opacity = "0";
+                    setTimeout(() => overlay.style.display = "none", 500);
+                }, 300);
+
+            } catch (err) {
+                console.error("SQLite initialization failed:", err);
+                activeDB = null;
+                showInitializationError(`SQLite could not open the database: ${err.message || err}`);
+            }
+        }, 0);
+    }
+
+    function showInitializationError(message) {
+        console.error(message);
+        updateLoadingProgress(0, message);
+        const status = document.getElementById("dbStatus");
+        if (status) {
+            status.className = "status";
+            status.textContent = "Database initialization failed";
+            status.title = message;
+        }
+    }
+
+    async function initializeApplication() {
+        if (dbInitStarted) return;
+        dbInitStarted = true;
+
+        try {
+            updateLoadingProgress(10, "Loading database configuration...");
+
+            const manifestPromise = fetchDatabaseManifest();
+            const manifest = await manifestPromise;
+            currentManifest = manifest;
+
+            const dictPromise = fetchAutocompleteDictionary(manifest);
+
+            if (isAppleTouchDevice()) {
+                // IMPORTANT: do not instantiate sql.js / load the 736 MB database into memory on iPhone/iPad.
+                await Promise.all([dictPromise, initializeMobileSQLite(manifest)]);
+                document.getElementById("unifiedSearchInput").disabled = false;
+                document.getElementById("unifiedSearchBtn").disabled = false;
+                document.querySelectorAll(".pim-input").forEach(el => el.disabled = false);
+                document.getElementById("pimSearchBtn").disabled = false;
+                if (!autocompleteInitialized && window.pimDictionary) {
+                    setupAutocomplete();
+                    autocompleteInitialized = true;
+                }
+                if (!pimEnterInitialized) {
+                    setupEnterToSearchPIM();
+                    pimEnterInitialized = true;
+                }
+                setTimeout(() => {
+                    const overlay = document.getElementById("loadingOverlay");
+                    overlay.style.opacity = "0";
+                    setTimeout(() => overlay.style.display = "none", 500);
+                }, 300);
+                return;
+            }
+
+            updateLoadingProgress(10, "Loading SQLite Engine...");
+            await loadDesktopSqlJs();
+            SQL = await initSqlJs({
+                locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
+            });
+
+            const [dbResult] = await Promise.all([
+                loadDatabaseFromCacheOrNetwork(manifest),
+                dictPromise
+            ]);
+
+            const cacheVersion = getManifestVersion(manifest) || dbResult.version || "";
+            loadDatabaseIntoMemory(dbResult.binary, cacheVersion, dbResult);
+        } catch (err) {
+            showInitializationError(`Startup failed: ${err.message || err}`);
+        }
+    }
+
+    openLocalDatabase()
+        .then(db => {
+            localStore = db;
+            initializeApplication();
+        })
+        .catch(async err => {
+            console.warn("IndexedDB is unavailable; running without persistent cache.", err);
+            localStore = null;
+            initializeApplication();
+        });
+
+    // ==========================================
+    // PIM: FUZZY AUTOCOMPLETE (FUSE.JS)
+    // ==========================================
+    window.fuseIndices = {};
+
+    function initFuse() {
+        if (!window.pimDictionary) return;
+        const options = { threshold: 0.3, distance: 100 }; 
+        
+        window.fuseIndices = {
+            distEng: new Fuse(window.pimDictionary.distEng, options),
+            distChi: new Fuse(window.pimDictionary.distChi, options),
+            devEng: new Fuse(window.pimDictionary.devEng, options),
+            devChi: new Fuse(window.pimDictionary.devChi, options),
+            streetEng: new Fuse(window.pimDictionary.streetEng, options),
+            streetChi: new Fuse(window.pimDictionary.streetChi, options)
+        };
+    }
+
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); };
+    }
+
+    function isChinese(str) { return /[\u3400-\u9FBF]/.test(str); }
+
+    function fetchSuggestions(inputValue, typeCategory, listId, inputId, nextInputId) {
+        const listEl = document.getElementById(listId);
+        const val = inputValue.trim().toUpperCase();
+        
+        const minChars = isChinese(val) ? 2 : 3;
+        if (val.length < minChars || !window.fuseIndices) { listEl.style.display = 'none'; return; }
+
+        const lang = isChinese(val) ? 'Chi' : 'Eng';
+        const fuseInstance = window.fuseIndices[typeCategory + lang];
+        if (!fuseInstance) return;
+
+        const results = fuseInstance.search(val, { limit: 8 });
+
+        listEl.innerHTML = '';
+        if (results.length > 0) {
+            const meta = document.createElement('div');
+            meta.className = 'autocomplete-meta';
+            meta.textContent = `${results.length} suggestion${results.length === 1 ? '' : 's'}`;
+            listEl.appendChild(meta);
+        }
+
+        results.forEach(res => {
+            const option = document.createElement('div');
+            option.className = 'autocomplete-option';
+            option.innerHTML = highlightAutocompleteText(res.item, val);
+            option.addEventListener('click', () => {
+                selectSuggestion(inputId, listId, res.item, nextInputId);
+            });
+            listEl.appendChild(option);
+        });
+
+        if (results.length > 0) {
+            listEl.style.display = 'block';
+            listEl.currentFocus = -1;
+        } else {
+            listEl.innerHTML = '<div class="autocomplete-empty">No matching suggestions</div>';
+            listEl.style.display = 'block';
+            listEl.currentFocus = -1;
+        }
+    }
+
+    function selectSuggestion(inputId, listId, value, nextInputId) {
+        document.getElementById(inputId).value = value;
+        document.getElementById(listId).style.display = 'none';
+        if (nextInputId) document.getElementById(nextInputId).focus();
+    }
+
+    function addActiveItem(items, listEl) {
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) items[i].classList.remove("autocomplete-active");
+        if (listEl.currentFocus >= items.length) listEl.currentFocus = 0;
+        if (listEl.currentFocus < 0) listEl.currentFocus = (items.length - 1);
+        items[listEl.currentFocus].classList.add("autocomplete-active");
+        items[listEl.currentFocus].scrollIntoView({ block: 'nearest' });
+    }
+
+    function attachKeyboardNav(inputId, listId) {
+        const input = document.getElementById(inputId);
+        const listEl = document.getElementById(listId);
+        input.addEventListener("keydown", function(e) {
+            const nodeList = listEl.style.display === 'block' ? listEl.querySelectorAll('.autocomplete-option') : null;
+            const items = nodeList ? Array.from(nodeList) : null;
+            if (e.key === "ArrowDown" && items && items.length > 0) { e.preventDefault(); listEl.currentFocus++; addActiveItem(items, listEl); }
+            else if (e.key === "ArrowUp" && items && items.length > 0) { e.preventDefault(); listEl.currentFocus--; addActiveItem(items, listEl); }
+            else if (e.key === "Enter" && items && items.length > 0 && listEl.currentFocus > -1) {
+                e.preventDefault(); e.stopImmediatePropagation(); items[listEl.currentFocus].click();
+            }
+        });
+    }
+
+    function setupAutocomplete() {
+        initFuse(); 
+        
+        const configs = [
+            { inp: 'inpDistrict', list: 'suggestDistrict', cat: 'dist', next: 'inpDev' },
+            { inp: 'inpDev', list: 'suggestDev', cat: 'dev', next: 'inpStreet' },
+            { inp: 'inpStreet', list: 'suggestStreet', cat: 'street', next: 'inpStreetNo' }
+        ];
+
+        configs.forEach(cfg => {
+            const inputEl = document.getElementById(cfg.inp);
+            inputEl.addEventListener('input', debounce((e) => fetchSuggestions(e.target.value, cfg.cat, cfg.list, cfg.inp, cfg.next), 200));
+            attachKeyboardNav(cfg.inp, cfg.list);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.input-wrapper')) document.querySelectorAll('.autocomplete-list').forEach(el => el.style.display = 'none');
+        });
+    }
+
+    function setupEnterToSearchPIM() {
+        document.querySelectorAll('.pim-input').forEach(el => {
+            el.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    document.querySelectorAll('.autocomplete-list').forEach(list => list.style.display = 'none');
+                    executePIMSearch();
+                }
+            });
+        });
+    }
+
+    function resetPIMForm() {
+        document.querySelectorAll('.pim-input').forEach(input => input.value = '');
+        document.querySelectorAll('.autocomplete-list').forEach(list => list.style.display = 'none');
+        document.getElementById('pimResultsCard').style.display = 'none';
+        document.getElementById('resultsTableBody').innerHTML = '';
+        document.getElementById('resultsWarning').style.display = 'none';
+        document.getElementById('pimResultsSummary').textContent = '--';
+        document.getElementById('inpDistrict').focus();
+    }
+
+    function executePIMSearch() {
+        if (!databaseIsReady()) return;
+
+        const district = document.getElementById('inpDistrict').value.trim().toUpperCase();
+        const dev = document.getElementById('inpDev').value.trim().toUpperCase();
+        const street = document.getElementById('inpStreet').value.trim().toUpperCase();
+        const freeFormat = document.getElementById('inpFreeFormat').value.trim().toUpperCase();
+        const streetNo = document.getElementById('inpStreetNo').value.trim().toUpperCase();
+        const block = document.getElementById('inpBlock').value.trim().toUpperCase();
+        const floor = document.getElementById('inpFloor').value.trim().toUpperCase();
+        const flat = document.getElementById('inpFlat').value.trim().toUpperCase();
+
+        if (!dev && !street && !freeFormat) {
+            alert("Please enter at least a Building/Estate Name, Street Name, or Free Format Search to anchor the search.");
+            return;
+        }
+
+        const btn = document.getElementById('pimSearchBtn');
+        const spinner = document.getElementById('pimSearchSpinner');
+        const btnText = document.getElementById('pimSearchBtnText');
+        
+        btn.disabled = true; spinner.style.display = 'inline-block'; btnText.textContent = 'Searching...';
+        document.getElementById('resultsWarning').style.display = 'none';
+
+        setTimeout(async () => {
+            let query = "SELECT PRN, FREE_FORMAT_ADDR_ENG, FREE_FORMAT_ADDR_CHN FROM addresses WHERE 1=1";
+            let params = [];
+
+            if (district) { query += isChinese(district) ? " AND AREA_DESC_CHN LIKE ?" : " AND AREA_DESC_ENG LIKE ?"; params.push(`%${district}%`); }
+            if (dev) { query += isChinese(dev) ? " AND DEV_NAME_CHN LIKE ?" : " AND DEV_NAME_ENG LIKE ?"; params.push(`%${dev}%`); }
+            if (street) { query += isChinese(street) ? " AND STREET_NAME_CHN LIKE ?" : " AND STREET_NAME_ENG LIKE ?"; params.push(`%${street}%`); }
+            
+            // Dynamic Tokenization for Free Format
+            if (freeFormat) {
+                let tokens = freeFormat.split(/\s+/).filter(Boolean);
+                tokens.forEach(token => {
+                    if (isChinese(token)) {
+                        query += " AND FREE_FORMAT_ADDR_CHN LIKE ?";
+                    } else {
+                        query += " AND FREE_FORMAT_ADDR_ENG LIKE ?";
+                    }
+                    params.push(`%${token}%`);
+                });
+            }
+
+            if (streetNo) { query += " AND HOUSE_NUM_PREFIX LIKE ?"; params.push(`%${streetNo}%`); }
+            if (block) { query += " AND BLOCK COLLATE NOCASE = ?"; params.push(block); } 
+            if (floor) { query += " AND FLOOR COLLATE NOCASE = ?"; params.push(floor); }
+            if (flat) { query += " AND FLAT COLLATE NOCASE = ?"; params.push(flat); }
+
+            query += " LIMIT 21"; 
+
+            try {
+                const tbody = document.getElementById('resultsTableBody'); tbody.innerHTML = "";
+                const results = await queryAddressDatabase(query, params);
+
+                let displayCount = Math.min(results.length, 20);
+                const warningBanner = document.getElementById('resultsWarning');
+
+                document.getElementById('pimResultsSummary').textContent = results.length > 0
+                    ? `${Math.min(results.length, 20)} shown${results.length > 20 ? ` of 20+` : ''}`
+                    : 'No matches';
+
+                if (results.length > 20) {
+                    warningBanner.className = "warning-red";
+                    warningBanner.innerHTML = "⚠️ Showing the first 20 matches. Add Block, Floor or Flat to narrow the result set.";
+                    warningBanner.style.display = "block";
+                } else if (results.length > 0) {
+                    warningBanner.className = "warning-green";
+                    warningBanner.innerHTML = `✅ Found ${results.length} match${results.length === 1 ? '' : 'es'}.`;
+                    warningBanner.style.display = "block";
+                } else {
+                    warningBanner.className = "warning-red";
+                    warningBanner.innerHTML = "No matching PRNs found." + buildZeroResultHelp({ dev, street, freeFormat, streetNo, block, floor, flat });
+                    warningBanner.style.display = "block";
+                }
+
+
+                for (let i = 0; i < displayCount; i++) {
+                    const row = results[i];
+                    const tr = document.createElement('tr');
+
+                    const prnCell = document.createElement('td');
+                    prnCell.style.display = 'flex';
+                    prnCell.style.alignItems = 'center';
+
+                    const prnLink = document.createElement('a');
+                    prnLink.className = 'prn-link';
+                    prnLink.textContent = row.PRN || '';
+                    prnLink.id = 'pim-prn-' + i;
+                    prnLink.addEventListener('click', () => launchUsseSearch(row.PRN));
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'pim-icon-copy-btn';
+                    copyBtn.title = 'Copy PRN';
+                    copyBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+                    copyBtn.addEventListener('click', () => copyText(prnLink.id, copyBtn));
+
+                    prnCell.appendChild(prnLink);
+                    prnCell.appendChild(copyBtn);
+
+                    const engCell = document.createElement('td');
+                    engCell.textContent = row.FREE_FORMAT_ADDR_ENG || 'N/A';
+
+                    const chiCell = document.createElement('td');
+                    chiCell.textContent = row.FREE_FORMAT_ADDR_CHN || 'N/A';
+
+                    tr.appendChild(prnCell);
+                    tr.appendChild(engCell);
+                    tr.appendChild(chiCell);
+                    tbody.appendChild(tr);
+                }
+
+                if (results.length === 0) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color: #64748b; padding: 20px;">No matching PRNs found for this combination. Try broadening your search or check your spelling.</td></tr>`;
+                document.getElementById('pimResultsCard').style.display = 'block';
+
+            } catch (err) { alert("An error occurred while searching the database."); } 
+            finally { btn.disabled = false; spinner.style.display = 'none'; btnText.textContent = 'Identify PRN'; }
+        }, 10);
+    }
+
+
+    // ==========================================
+    // USSE: UI HELPERS & TEXT TOOLS
+    // ==========================================
+    window.copyText = function(elementId, btn) {
+        const text = document.getElementById(elementId).textContent;
+        if(text === "--" || text === "N/A" || text.includes("Loading")) return;
+        navigator.clipboard.writeText(text).then(() => {
+            btn.classList.add("copied");
+            setTimeout(() => { btn.classList.remove("copied"); }, 2000);
+        });
+    };
+
+    function toggleMapLang() {
+        if (!miniMap) return;
+        const btn = document.getElementById('mapLangBtn');
+        if (currentMapLang === 'en') {
+            miniMap.removeLayer(labelLayerEng); miniMap.addLayer(labelLayerChi);
+            currentMapLang = 'tc'; btn.innerHTML = '🔠 EN / 中';
+        } else {
+            miniMap.removeLayer(labelLayerChi); miniMap.addLayer(labelLayerEng);
+            currentMapLang = 'en'; btn.innerHTML = '🈯 中 / EN';
+        }
+    }
+
+    function recenterMap() { if (miniMap && currentLat && currentLng) miniMap.setView([currentLat, currentLng], 18); }
+    function openGoogleMaps() { if (currentLat && currentLng) window.open(`https://www.google.com/maps/search/?api=1&query=${currentLat},${currentLng}`, '_blank'); }
+    async function copyCoords() {
+        if (!(currentLat && currentLng)) return;
+        const value = `${currentLat}, ${currentLng}`;
+        try {
+            await navigator.clipboard.writeText(value);
+            const btn = document.querySelector('.map-action-btn[aria-label="Copy coordinates"]');
+            const label = btn?.querySelector('.map-action-label');
+            if (label) {
+                const original = label.textContent;
+                label.textContent = ' Copied';
+                setTimeout(() => { label.textContent = original; }, 1400);
+            }
+        } catch (e) {
+            alert(`Coordinates: ${value}`);
+        }
+    }
+
+    const escapeXML = (str) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+    function useSearchExample(value) {
+        const input = document.getElementById('unifiedSearchInput');
+        if (!input || input.disabled) return;
+        input.value = value;
+        input.focus();
+        handleAutoDetect();
+    }
+
+    function viewResultMap() {
+        if (window.innerWidth <= 992) {
+            setMobileResultView('map');
+        } else {
+            document.getElementById('mapSection')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    function setMobileResultView(view) {
+        const container = document.getElementById('resultsContainer');
+        const dataBtn = document.getElementById('mobileDataBtn');
+        const mapBtn = document.getElementById('mobileMapBtn');
+        if (!container || !dataBtn || !mapBtn) return;
+        const isMap = view === 'map';
+        container.classList.toggle('mobile-map-view', isMap);
+        container.classList.toggle('mobile-data-view', !isMap);
+        dataBtn.classList.toggle('active', !isMap);
+        mapBtn.classList.toggle('active', isMap);
+        if (isMap && miniMap) setTimeout(() => miniMap.invalidateSize(), 50);
+    }
+
+    function setResultSummary(title, text, icon = '✓') {
+        const card = document.getElementById('resultSummary');
+        const titleEl = document.getElementById('resultSummaryTitle');
+        const textEl = document.getElementById('resultSummaryText');
+        const iconEl = card?.querySelector('.result-summary-icon');
+        if (!card || !titleEl || !textEl) return;
+        titleEl.textContent = title || '';
+        textEl.textContent = text || '';
+        if (iconEl) iconEl.textContent = icon;
+        card.style.display = 'flex';
+    }
+
+    function buildPimFilterSummary(values) {
+        const labels = [
+            ['Building', values.dev], ['Street', values.street], ['Free Format', values.freeFormat],
+            ['Street No.', values.streetNo], ['Block', values.block], ['Floor', values.floor], ['Flat', values.flat]
+        ];
+        return labels.filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`).join(' · ');
+    }
+
+    function buildZeroResultHelp(values) {
+        const used = buildPimFilterSummary(values);
+        const suggestions = [];
+        if (values.flat) suggestions.push('remove Flat');
+        if (values.floor) suggestions.push('remove Floor');
+        if (values.streetNo) suggestions.push('remove Street No.');
+        if (values.block) suggestions.push('remove Block');
+        if (!values.freeFormat) suggestions.push('try Free Format Search');
+        const tip = suggestions.slice(0, 3).join(' · ');
+        return `<div class="pim-zero-help"><strong>Search used:</strong> ${escapeXML(used || 'No filters')}<br><strong>Try:</strong> ${escapeXML(tip || 'broaden the wording or check spelling')}</div>`;
+    }
+
+    function highlightAutocompleteText(text, query) {
+        const safeText = escapeXML(text);
+        const safeQuery = String(query || '').trim();
+        if (!safeQuery) return safeText;
+        const escaped = safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(escaped, 'ig');
+        return safeText.replace(re, match => `<span class="autocomplete-match">${match}</span>`);
+    }
+
+    function setManualMode(mode) {
+        currentSearchMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab' + mode).classList.add('active');
+        const badge = document.getElementById('detectedTypeBadge');
+        if(mode === 'AUTO') { badge.textContent = "Mode: Auto-Detect"; badge.style.color = "var(--accent-green)"; }
+        else { badge.textContent = `Mode: Forced (${mode})`; badge.style.color = "#64748b"; }
+        handleAutoDetect();
+    }
+
+    function handleAutoDetect() {
+        if(currentSearchMode !== 'AUTO') return;
+        const val = document.getElementById('unifiedSearchInput').value.trim().toUpperCase();
+        const badge = document.getElementById('detectedTypeBadge');
+        
+        if(!val) { badge.textContent = "Mode: Auto-Detect"; return; }
+        
+        if (/^[A-Z]\d{7}$/.test(val)) badge.textContent = "Detected: PRN";
+        else if (/^\d{3,8}$/.test(val)) badge.textContent = "Detected: Structure ID";
+        else if (/^\d{10}[A-Z0-9]+$/.test(val)) badge.textContent = "Detected: GeoAddress (CSUID)";
+        else if (/^[A-Z]{1,3}\d{1,5}\/\d{2,4}(?:\(OP\)|\/OP)?$/i.test(val)) badge.textContent = "Detected: OP No.";
+        else badge.textContent = "Detected: Address string";
+    }
+
+    function executeUnifiedSearch() {
+        const rawInput = document.getElementById('unifiedSearchInput').value.trim();
+        if (!rawInput || !databaseIsReady()) return;
+        
+        const val = rawInput.toUpperCase();
+        let targetAction = currentSearchMode;
+
+        if (currentSearchMode === 'AUTO') {
+            if (/^[A-Z]\d{7}$/.test(val)) targetAction = 'PRN';
+            else if (/^\d{3,8}$/.test(val)) targetAction = 'BLDG';
+            else if (/^\d{10}[A-Z0-9]+$/.test(val)) targetAction = 'ADDR';
+            else if (/^[A-Z]{1,3}\d{1,5}\/\d{2,4}(?:\(OP\)|\/OP)?$/i.test(val)) targetAction = 'OP';
+            else targetAction = 'ADDR'; 
+        }
+
+        if(targetAction === 'PRN') executePRNSearch(val);
+        else if (targetAction === 'ADDR') executeADDRSearch(rawInput, /^\d{10}[A-Z0-9]+$/.test(val));
+        else executeBDOpSearch(targetAction, val);
+    }
+
+    document.getElementById('unifiedSearchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !this.disabled) { e.preventDefault(); document.getElementById('unifiedSearchBtn').click(); }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            const search = document.getElementById('unifiedSearchInput');
+            if (search && !search.disabled) { e.preventDefault(); search.focus(); search.select(); }
+        }
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.autocomplete-list').forEach(list => list.style.display = 'none');
+        }
+    });
+
+    function cleanChineseNum(str) { if (!str) return ""; return str.replace(/\s+AND\s+/g, '及').replace(/\s*&\s*/g, '及').replace(/\s*-\s*/g, '-').replace(/\s*\/\s*/g, '/'); }
+
+    function updateUIField(textId, value) {
+        const textEl = document.getElementById(textId);
+        if (!textEl) return;
+        const btnEl = textEl.parentElement.querySelector('.icon-copy-btn');
+        
+        if (value && value.toString().trim() !== "") {
+            textEl.textContent = value;
+            textEl.classList.remove('empty-state');
+            if(btnEl) btnEl.classList.add('active-copy');
+        } else {
+            textEl.textContent = "--";
+            textEl.classList.add('empty-state');
+            if(btnEl) btnEl.classList.remove('active-copy');
+        }
+    }
+
+    function prepareUI() {
+        document.getElementById('welcomeState').style.display = 'none';
+        document.getElementById('resultsContainer').classList.add('active');
+        document.getElementById('resultsContainer').classList.remove('mobile-map-view');
+        document.getElementById('resultsContainer').classList.add('mobile-data-view');
+        document.getElementById('mobileDataBtn')?.classList.add('active');
+        document.getElementById('mobileMapBtn')?.classList.remove('active');
+        document.getElementById('searchSpinner').style.display = 'inline-block';
+        const query = document.getElementById('unifiedSearchInput')?.value.trim() || '';
+        setResultSummary('Searching…', query ? `Looking up: ${query}` : 'Preparing results…', '⌕');
+
+        resultFields.forEach(f => {
+            const el = document.getElementById(f);
+            if(el) { el.textContent = "Loading..."; el.classList.remove('empty-state'); }
+        });
+        document.getElementById('dynamicStreetsGrid').innerHTML = "";
+        document.getElementById('mapPlaceholder').style.display = 'flex';
+        
+        document.getElementById('bdDomainBlock').style.display = 'none';
+        document.getElementById('haDomainBlock').style.display = 'none';
+        document.getElementById('noBldgDataMsg').style.display = 'block';
+    }
+    
+    function fallbackClearLoading() {
+        resultFields.forEach(f => {
+            const el = document.getElementById(f);
+            if (el && el.textContent === "Loading...") {
+                el.textContent = "--"; el.classList.add('empty-state');
+                const btnEl = el.parentElement.querySelector('.icon-copy-btn');
+                if(btnEl) btnEl.classList.remove('active-copy');
+            }
+        });
+        document.getElementById('searchSpinner').style.display = 'none';
+        const summaryTitle = document.getElementById('resultSummaryTitle');
+        if (!summaryTitle || summaryTitle.textContent === 'Searching…') {
+            const query = document.getElementById('unifiedSearchInput')?.value.trim() || '';
+            setResultSummary('Search complete', query ? `Results for: ${query}` : 'Results ready', '✓');
+        }
+    }
+
+
+    // ==========================================
+    // USSE: MAP RENDERING
+    // ==========================================
+    function updateMap(easting, northing) {
+        if (!easting || !northing) return;
+        document.getElementById('mapPlaceholder').style.display = 'none';
+
+        let hk80Coords = [parseFloat(easting), parseFloat(northing)];
+        let wgs84Coords = proj4("EPSG:2326", "EPSG:4326", hk80Coords);
+        currentLng = wgs84Coords[0]; currentLat = wgs84Coords[1];
+
+        if (!miniMap) {
+            miniMap = L.map('mapContainer', { zoomControl: true, attributionControl: false }).setView([currentLat, currentLng], 18);
+            L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(miniMap);
+            labelLayerEng = L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/en/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 });
+            labelLayerChi = L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 });
+            
+            if (currentMapLang === 'en') labelLayerEng.addTo(miniMap);
+            else labelLayerChi.addTo(miniMap);
+            
+            const redIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', iconSize: [25, 41], iconAnchor: [12, 41]});
+            mapMarker = L.marker([currentLat, currentLng], {icon: redIcon}).addTo(miniMap);
+        } else {
+            miniMap.setView([currentLat, currentLng], 18);
+            mapMarker.setLatLng([currentLat, currentLng]);
+        }
+        setTimeout(() => { miniMap.invalidateSize(); }, 200);
+    }
+
+    // ==========================================
+    // USSE: DYNAMIC STREET ENGINE
+    // ==========================================
+    function renderDynamicStreets(streetsArray) {
+        let html = '';
+        streetsArray.forEach((s, i) => {
+            let n = i + 1;
+            html += `<div class="full-width" style="margin-top:10px;"><div class="domain-title" style="margin-bottom:4px;">Street ${n}</div>
+            <div class="grid-3-col">
+                <div class="result-tile"><label>Street Name (Eng)</label><div class="result-value" id="stNameEng_${n}">${s.engName}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNameEng_${n}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                <div class="result-tile"><label>Street Name (Chi)</label><div class="result-value" id="stNameChi_${n}">${s.chiName}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNameChi_${n}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+                <div class="result-tile"><label>Street No.</label><div class="result-value" id="stNo_${n}">${s.engNo}</div><button class="icon-copy-btn active-copy" onclick="copyText('stNo_${n}', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>
+            </div></div>`;
+        });
+        document.getElementById('dynamicStreetsGrid').innerHTML = html;
+    }
+
+    function extractStreetInfo(addressPart) {
+        if (!addressPart) return null;
+        let suffixes = ['STREET', 'ROAD', 'LANE', 'PATH', 'DRIVE', 'AVENUE', 'CIRCUIT', 'CRESCENT', 'TERRACE', 'BOULEVARD', 'SQUARE'];
+        let words = addressPart.replace(/,/g, ' ').split(/\s+/).filter(w => w);
+        let streetWords = [], numberWords = [], suffixIndex = -1;
+        for (let i = words.length - 1; i >= 0; i--) { if (suffixes.includes(words[i])) { suffixIndex = i; break; } }
+        if (suffixIndex === -1) return null;
+        for (let i = suffixIndex; i >= 0; i--) { if (/\d/.test(words[i])) break; streetWords.unshift(words[i]); }
+        let streetName = streetWords.join(' '), numberEndIndex = suffixIndex - streetWords.length;
+        for (let i = numberEndIndex; i >= 0; i--) {
+            let w = words[i];
+            if (/(?:\/F|FLAT|ROOM|RM|BLK|BLOCK|PHASE|LEVEL|TOWER)\b/i.test(w)) break;
+            if (/\d/.test(w) || /^NO\.?$|^NOS\.?$|^-?$|^\/?$|^&$|^AND$/.test(w)) numberWords.unshift(w); else break;
+        }
+        return { name: streetName, num: numberWords.join(' ').replace(/^(?:(?:NOS?\.?|&|AND|-|\/)\s*)+/i, '').trim() };
+    }
+
+    // ==========================================
+    // USSE: HOUSING AUTHORITY ENGINE
+    // ==========================================
+    async function checkSubsidizedHousing(engEstate, engDist, chiEstate, chiDist) {
+        if (!engEstate && !chiEstate) return null;
+        let cleanChi = chiEstate ? chiEstate.replace(/(?:第[一二三四五六七八九十百零0-9]+[期階段])/g, '').replace(/[A-Z0-9]+座/g, '').trim().replace(/'/g, "''") : "";
+        let distChi = chiDist ? chiDist.replace(/區$/, '').trim().replace(/'/g, "''") : "";
+        let cleanEng = engEstate ? engEstate.replace(/\b(?:PHASE|STAGE)\s*[IVX0-9A-Z]+\b/gi, '').replace(/\bBLOCK\s+[A-Z0-9]+\b/gi, '').trim().toUpperCase().replace(/'/g, "''") : "";
+        let distEng = engDist ? engDist.toUpperCase().replace(/\s*DISTRICT/gi, '').trim().replace(/'/g, "''") : "";
+
+        function getVal(obj, possibleKeys) {
+            let keys = Object.keys(obj);
+            for (let pk of possibleKeys) {
+                let target = pk.toLowerCase().replace(/[^a-z0-9]/g, '');
+                for (let k of keys) { if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === target) return obj[k]; }
+            }
+            return null;
+        }
+
+        async function fetchHA(url) {
+            try { let res = await fetch(url); if (res.ok) { let json = await res.json(); if (json && json.data && json.data.length > 0) return json.data[0]; } } catch (e) {} return null;
+        }
+
+        if (cleanEng) {
+            let qpPrh = distEng ? ` WHERE Estate_Name LIKE('%${cleanEng}%') AND District_Name LIKE('%${distEng}%')` : ` WHERE Estate_Name LIKE('%${cleanEng}%')`;
+            let dataPrh = await fetchHA(`https://data.housingauthority.gov.hk/psi/rest/criteriafilter/prh-estates/en/json?qp=${encodeURIComponent(qpPrh)}`);
+            if (dataPrh) return { type: getVal(dataPrh, ["typeofestate", "Type of Estate"]) || "Public Rental Housing", year: getVal(dataPrh, ["yearofintake", "Year of Intake"]), blocks: getVal(dataPrh, ["typeofblock", "type_of_block", "typesofblocks", "Type(s) of Block(s)"]) };
+
+            let qpHos = distEng ? ` WHERE estate_name LIKE('%${cleanEng}%') AND district_name LIKE('%${distEng}%')` : ` WHERE estate_name LIKE('%${cleanEng}%')`;
+            let dataHos = await fetchHA(`https://data.housingauthority.gov.hk/psi/rest/criteriafilter/hos-courts/en/json?qp=${encodeURIComponent(qpHos)}`);
+            if (dataHos) return { type: getVal(dataHos, ["soldunder", "sold_under", "Sold Under"]), year: getVal(dataHos, ["yearofcompletion", "year_of_completion", "Year of Completion"]), blocks: getVal(dataHos, ["typeofblock", "type_of_block", "typesofblocks", "Type(s) of Block(s)"]) };
+        }
+        if (cleanChi) {
+            let qpPrh = distChi ? ` WHERE Estate_Name LIKE('%${cleanChi}%') AND District_Name LIKE('%${distChi}%')` : ` WHERE Estate_Name LIKE('%${cleanChi}%')`;
+            let dataPrh = await fetchHA(`https://data.housingauthority.gov.hk/psi/rest/criteriafilter/prh-estates/tc/json?qp=${encodeURIComponent(qpPrh)}`);
+            if (dataPrh) return { type: getVal(dataPrh, ["屋邨類別", "Type of Estate"]) || "Public Rental Housing", year: getVal(dataPrh, ["入伙年份", "Year of Intake"]), blocks: getVal(dataPrh, ["樓宇類型", "Type(s) of Block(s)"]) };
+
+            let qpHos = distChi ? ` WHERE estate_name LIKE('%${cleanChi}%') AND district_name LIKE('%${distChi}%')` : ` WHERE estate_name LIKE('%${cleanChi}%')`;
+            let dataHos = await fetchHA(`https://data.housingauthority.gov.hk/psi/rest/criteriafilter/hos-courts/tc/json?qp=${encodeURIComponent(qpHos)}`);
+            if (dataHos) return { type: getVal(dataHos, ["出售計劃", "Sold Under"]), year: getVal(dataHos, ["落成年份", "Year of Completion"]), blocks: getVal(dataHos, ["樓宇類型", "Type(s) of Block(s)"]) };
+        }
+        return null; 
+    }
+
+    // ==========================================
+    // USSE: CSDI / BUILDINGS DEPT ENGINE
+    // ==========================================
+    async function fetchCSDIInfo(csuid) {
+        updateUIField('csuidText', csuid);
+        if (!csuid) return;
+        try {
+            let filter1 = `<Filter><PropertyIsEqualTo><PropertyName>BuildingCSUID</PropertyName><Literal>'${escapeXML(csuid)}'</Literal></PropertyIsEqualTo></Filter>`;
+            let url1 = `https://portal.csdi.gov.hk/server/services/common/landsd_rcd_1637211194312_35158/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=BuildingRelateOPStructure&outputFormat=geojson&count=10&filter=${encodeURIComponent(filter1)}`;
+            let res1 = await fetch(url1); let json1 = await res1.json();
+            let structureId = "";
+            if (json1.features && json1.features.length > 0) {
+                for (let f of json1.features) { if (f.properties && f.properties.BuildingStructureID) { structureId = f.properties.BuildingStructureID; break; } }
+            }
+            updateUIField('structureIdText', structureId);
+
+            if (structureId) {
+                let filter2 = `<Filter><PropertyIsEqualTo><PropertyName>BuildingStructureID</PropertyName><Literal>${structureId}</Literal></PropertyIsEqualTo></Filter>`;
+                let url2 = `https://portal.csdi.gov.hk/server/services/common/landsd_rcd_1637211194312_35158/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=OPStructure&outputFormat=geojson&count=10&filter=${encodeURIComponent(filter2)}`;
+                let res2 = await fetch(url2); let json2 = await res2.json();
+                let opNo = "";
+                if (json2.features && json2.features.length > 0) {
+                    for (let f of json2.features) { if (f.properties && f.properties.OPNo) { opNo = f.properties.OPNo; break; } }
+                }
+                updateUIField('opNoText', opNo);
+
+                if (opNo) {
+                    let hasBDRow = false;
+                    
+                    // Fetch directly from the CSDI BD API using NSEARCH2_E (OP No.)
+                    let filterBD = `<Filter><PropertyIsEqualTo><PropertyName>NSEARCH2_E</PropertyName><Literal>'${escapeXML(opNo)}'</Literal></PropertyIsEqualTo></Filter>`;
+                    let urlBD = `https://portal.csdi.gov.hk/server/services/common/bd_rcd_1631167534872_19764/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=BDBIAR&outputFormat=geojson&count=1&filter=${encodeURIComponent(filterBD)}`;
+                    
+                    try {
+                        let resBD = await fetch(urlBD);
+                        let jsonBD = await resBD.json();
+                        if (jsonBD.features && jsonBD.features.length > 0) {
+                            let bdRow = jsonBD.features[0].properties;
+                            hasBDRow = true;
+                            
+                            // Map using the raw CSV column names
+                            let permittedUse = bdRow.NSEARCH5_E; // Permitted_Use
+                            let opDate = bdRow.NSEARCH3_E;       // OP_Date
+                            
+                            if (permittedUse) updateUIField('permittedUseText', permittedUse);
+                            if (opDate) {
+                                updateUIField('opDateText', opDate);
+                                let match = String(opDate).match(/\d{4}/);
+                                if (match) updateUIField('ageText', (new Date().getFullYear() - parseInt(match[0])) + " Years");
+                            }
+                        }
+                    } catch(e) {}
+
+                    // Fallback to LandsD OPStructure API if the BD dataset misses the OPDate
+                    let url3 = `https://portal.csdi.gov.hk/server/services/common/landsd_rcd_1637211194312_35158/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=OP&outputFormat=geojson&count=10&filter=${encodeURIComponent(`<Filter><PropertyIsEqualTo><PropertyName>OPNo</PropertyName><Literal>'${escapeXML(opNo)}'</Literal></PropertyIsEqualTo></Filter>`)}`;
+                    let res3 = await fetch(url3); let json3 = await res3.json();
+                    let fallbackOpDate = "";
+                    if (json3.features && json3.features.length > 0) {
+                        for (let f of json3.features) { if (f.properties && f.properties.OPDate) { fallbackOpDate = f.properties.OPDate; break; } }
+                    }
+                    if (fallbackOpDate && document.getElementById('opDateText').textContent === "Loading...") {
+                        hasBDRow = true;
+                        updateUIField('opDateText', fallbackOpDate);
+                        let match = String(fallbackOpDate).match(/\d{4}/);
+                        if (match) updateUIField('ageText', (new Date().getFullYear() - parseInt(match[0])) + " Years");
+                    }
+                    
+                    if(hasBDRow) {
+                        document.getElementById('bdDomainBlock').style.display = 'block';
+                        document.getElementById('noBldgDataMsg').style.display = 'none';
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+
+    // ==========================================
+    // USSE: ALS ADDRESS ENGINE
+    // ==========================================
+    async function fetchALSAndCSDI(cleanSearchAddress, row, primaryStreet, fullPrimaryNum, isCodeSearch = false) {
+        try {
+            if (!isCodeSearch) {
+                let searchStrUpper = cleanSearchAddress.toUpperCase();
+                let specificEntrance = "";
+                   
+                let bracketMatch = searchStrUpper.match(/\(([^)]+)\)/);
+                if (bracketMatch) {
+                    let insideBracket = bracketMatch[1];
+                    let ignoreRegex = /\b(FORMERLY|KNOWN AS|A\.K\.A\.?|AKA)\b/i;
+                    if (!ignoreRegex.test(insideBracket) && /(STREET|ROAD|LANE|PATH|DRIVE|AVENUE|CIRCUIT|CRESCENT|TERRACE|BOULEVARD|SQUARE)/.test(insideBracket)) {
+                        specificEntrance = insideBracket.replace(/\bNOS?\.?\s*/g, '').trim();
+                    }
+                }
+
+                searchStrUpper = searchStrUpper.replace(/^.*(?:FLOOR|\bG\/F\b|\bM\/F\b|\bU\/F\b|\bLG\/F\b|\bUG\/F\b|\d+\/F\b|\bLEVEL\s*\d+\b|\bBASEMENT\b)\s*(?:OF\s+)?/i, '').replace(/^[,\s]+/, '').trim();
+
+                if (specificEntrance) {
+                    let streetCutRegex = /\b(?:NOS?\.?\s*\d|\d+[-/A-Z\d\s]*?\s+(?:STREET|ROAD|LANE|PATH|DRIVE|AVENUE|CIRCUIT|CRESCENT|TERRACE|BOULEVARD|SQUARE)\b)/i;
+                    let cutMatch = searchStrUpper.match(streetCutRegex);
+                    if (cutMatch) searchStrUpper = searchStrUpper.substring(0, cutMatch.index).trim();
+                    searchStrUpper = searchStrUpper.replace(/\bNOS?\.?\s*$/i, '').trim(); 
+                    cleanSearchAddress = (searchStrUpper + " " + specificEntrance).trim();
+                } else {
+                    cleanSearchAddress = searchStrUpper.replace(/\bNOS?\.?\s*/g, '').trim();
+                }
+            }
+
+            const apiUrl = isCodeSearch ? `https://www.als.gov.hk/galookup?ga=${encodeURIComponent(cleanSearchAddress)}` : `https://www.als.gov.hk/lookup?q=${encodeURIComponent(cleanSearchAddress)}`;
+            const response = await fetch(apiUrl, { headers: { "Accept": "application/json", "Accept-Language": "en,zh-Hant" }});
+            const json = await response.json();
+
+            if (json.SuggestedAddress && json.SuggestedAddress.length > 0) {
+                const premises = json.SuggestedAddress[0].Address.PremisesAddress;
+                const eng = premises.EngPremisesAddress || {}, chi = premises.ChiPremisesAddress || {};
+                
+                updateUIField('bldgEngText', eng.BuildingName); 
+                updateUIField('bldgChiText', chi.BuildingName);
+                updateUIField('estateEngText', eng.EngEstate?.EstateName); 
+                updateUIField('estateChiText', chi.ChiEstate?.EstateName);
+                updateUIField('distEngText', eng.EngDistrict?.DcDistrict);
+                updateUIField('distChiText', chi.ChiDistrict?.DcDistrict);
+                
+                let geo = Array.isArray(premises.GeospatialInformation) ? premises.GeospatialInformation[0] : (premises.GeospatialInformation || {});
+                updateUIField('eastingText', geo.Easting); updateUIField('northingText', geo.Northing);
+                if (geo.Easting && geo.Northing) updateMap(geo.Easting, geo.Northing);
+                if (premises.GeoAddress) fetchCSDIInfo(premises.GeoAddress);
+
+                let eName = eng.EngEstate?.EstateName || (eng.BuildingName && (eng.BuildingName.includes("COURT") || eng.BuildingName.includes("ESTATE")) ? eng.BuildingName : null);
+                let cName = chi.ChiEstate?.EstateName || (chi.BuildingName && (chi.BuildingName.includes("苑") || chi.BuildingName.includes("邨")) ? chi.BuildingName : null);
+
+                let subData = await checkSubsidizedHousing(eName, eng.EngDistrict?.DcDistrict, cName, chi.ChiDistrict?.DcDistrict);
+                if (subData) {
+                    document.getElementById('haDomainBlock').style.display = 'block';
+                    document.getElementById('noBldgDataMsg').style.display = 'none';
+                    updateUIField('subHousingTypeText', subData.type);
+                    updateUIField('yearCompText', subData.year);
+                    updateUIField('blockTypeText', subData.blocks);
+                    let yearMatch = subData.year ? String(subData.year).match(/\d{4}/) : null;
+                    if (yearMatch) updateUIField('haAgeText', (new Date().getFullYear() - parseInt(yearMatch[0])) + " Years");
+                }
+
+                let addressStr = row && row.FREE_FORMAT_ADDR_ENG ? row.FREE_FORMAT_ADDR_ENG.toUpperCase() : cleanSearchAddress.toUpperCase();
+                let engAddrParts = [];
+                let blockStrEng = (row && row.BLOCK && row.BLOCK.trim() !== "") ? "BLK " + row.BLOCK.trim().toUpperCase() : (eng.EngBlock?.BlockNo ? `${eng.EngBlock.BlockDescriptor || "BLK"} ${eng.EngBlock.BlockNo}`.trim().toUpperCase() : "");
+                if (blockStrEng) engAddrParts.push(blockStrEng);
+                if (eng.BuildingName) engAddrParts.push(eng.BuildingName.toUpperCase());
+                if (eng.EngEstate?.EstateName) engAddrParts.push(eng.EngEstate.EstateName.toUpperCase());
+                
+                let stNoEng = eng.EngStreet?.BuildingNoFrom || ""; if (eng.EngStreet?.BuildingNoTo) stNoEng += "-" + eng.EngStreet.BuildingNoTo;
+                let fullStreetEng = `${stNoEng} ${eng.EngStreet?.StreetName || ""}`.trim().toUpperCase();
+                if (fullStreetEng) engAddrParts.push(fullStreetEng);
+                if (eng.EngVillage?.VillageName) engAddrParts.push(eng.EngVillage.VillageName.toUpperCase());
+                if (eng.EngArea?.AreaName) engAddrParts.push(eng.EngArea.AreaName.toUpperCase());
+                
+                let regionEng = eng.Region ? eng.Region.toUpperCase() : "";
+                if(!regionEng) regionEng = addressStr.includes("KOWLOON") ? "KOWLOON" : addressStr.includes("NEW TERRITORIES") ? "NEW TERRITORIES" : "HONG KONG";
+                if(regionEng === "KLN") regionEng = "KOWLOON"; else if(regionEng === "NT" || regionEng === "N.T.") regionEng = "NEW TERRITORIES";
+                if (regionEng) engAddrParts.push(regionEng);
+                updateUIField('engAddressText', engAddrParts.join(" "));
+
+                let suffixes = ['STREET', 'ROAD', 'LANE', 'PATH', 'DRIVE', 'AVENUE', 'CIRCUIT', 'CRESCENT', 'TERRACE', 'BOULEVARD', 'SQUARE'];
+                let addressStrForStreets = addressStr.replace(/\([^)]*\)/g, ' '); 
+                let parts = addressStrForStreets.match(new RegExp(`(?:.*?(?:\\b${suffixes.join("\\b|\\b")}\\b))`, "g")) || [addressStrForStreets]; 
+                let extractedStreets = parts.map(p => extractStreetInfo(p)).filter(i => i);
+                let streetsData = [], primaryFound = false;
+
+                for (let ext of extractedStreets) {
+                    if ((primaryStreet.includes(ext.name) || ext.name.includes(primaryStreet)) && !primaryFound) {
+                        streetsData.push({ isPrimary: true, engName: ext.name, engNo: ext.num.replace(/\s+/g, ' '), chiName: chi.ChiStreet?.StreetName || "--" });
+                        primaryFound = true;
+                    } else streetsData.push({ isPrimary: false, engName: ext.name, engNo: ext.num.replace(/\s+/g, ' ') });
+                }
+                if (!primaryFound && streetsData.length > 0) streetsData[0].isPrimary = true;
+                else if (!primaryFound && primaryStreet) streetsData.unshift({ isPrimary: true, engName: primaryStreet, engNo: fullPrimaryNum.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' '), chiName: chi.ChiStreet?.StreetName || "--" });
+                if (streetsData.length === 0 && eng.EngStreet) streetsData.push({ isPrimary: true, engName: eng.EngStreet.StreetName || "--", engNo: (eng.EngStreet.BuildingNoFrom || "") + (eng.EngStreet.BuildingNoTo ? "-" + eng.EngStreet.BuildingNoTo : ""), chiName: chi.ChiStreet?.StreetName || "--" });
+
+                for (let s of streetsData) {
+                    if (s.isPrimary) continue;
+                    try {
+                        const secResp = await fetch(`https://www.als.gov.hk/lookup?q=${encodeURIComponent(`${s.engNo} ${s.engName}`)}`, { headers: { "Accept": "application/json", "Accept-Language": "en,zh-Hant" }});
+                        const secJson = await secResp.json();
+                        s.chiName = secJson.SuggestedAddress ? secJson.SuggestedAddress[0].Address.PremisesAddress.ChiPremisesAddress?.ChiStreet?.StreetName || "--" : "--";
+                    } catch(e) { s.chiName = "--"; }
+                }
+
+                if (premises.ChiPremisesAddress) {
+                    let regionStr = chi.Region || (addressStr.includes("KOWLOON") ? "九龍" : addressStr.includes("NEW TERRITORIES") ? "新界" : "香港");
+                    let primaryStrChi = "", secondaryStrChi = "";
+                    let pStreet = streetsData.find(s => s.isPrimary);
+                    if (pStreet && pStreet.chiName && pStreet.chiName !== "--") primaryStrChi = pStreet.chiName + (pStreet.engNo ? cleanChineseNum(pStreet.engNo) + "號" : "");
+                    for(let s of streetsData) { if(!s.isPrimary && s.chiName && s.chiName !== "--") secondaryStrChi += s.chiName + (s.engNo ? cleanChineseNum(s.engNo) + "號" : ""); }
+                    
+                    let chiParts = [regionStr, chi.ChiArea?.AreaName, chi.ChiVillage?.VillageName, primaryStrChi, secondaryStrChi, chi.ChiEstate?.EstateName, chi.BuildingName];
+                    let blockStrChi = (row && row.BLOCK && row.BLOCK.trim() !== "") ? row.BLOCK.replace(/\([^)]*\)/g, '').trim() + "座" : (chi.ChiBlock?.BlockNo ? cleanChineseNum(chi.ChiBlock.BlockNo) + (chi.ChiBlock.BlockDescriptor || "座") : "");
+                    if (blockStrChi) chiParts.push(blockStrChi);
+                    if (row && row.FLOOR && row.FLOOR.trim() !== "") chiParts.push(row.FLOOR.replace(/\([^)]*\)/g, '').trim() + "字樓");
+                    if (row && row.FLAT && row.FLAT.trim() !== "") chiParts.push(row.FLAT.replace(/\([^)]*\)/g, '').trim() + "室");
+                    
+                    updateUIField('chiAddressText', chiParts.filter(Boolean).join(""));
+                }
+                renderDynamicStreets(streetsData);
+            } else fallbackClearLoading();
+        } catch (error) { fallbackClearLoading(); }
+    }
+
+
+    // ==========================================
+    // USSE: QUERY EXECUTION SWITCHBOARD
+    // ==========================================
+    async function executePRNSearch(val) {
+        prepareUI();
+        let row = null; let isLotPrnFallback = false;
+
+        const directRows = await queryAddressDatabase("SELECT * FROM addresses WHERE PRN = ?", [val]);
+        if (directRows.length) row = directRows[0];
+
+        if (!row) {
+            const fallbackRows = await queryAddressDatabase("SELECT * FROM addresses WHERE FIRST_REFERENCE_LOT_PRN = ? LIMIT 1", [val]);
+            if (fallbackRows.length) { row = fallbackRows[0]; isLotPrnFallback = true; }
+        }
+
+        let refPrn = (row && !isLotPrnFallback) ? (row.FIRST_REFERENCE_LOT_PRN ? row.FIRST_REFERENCE_LOT_PRN.toString().trim() : "") : val;
+        if (refPrn) {
+            try {
+                const lotResp = await fetch(`https://portal.csdi.gov.hk/server/services/common/landsd_rcd_1637217253134_22729/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=LotRegister&outputFormat=geojson&count=10&filter=${encodeURIComponent(`<Filter><PropertyIsEqualTo><PropertyName>PRN</PropertyName><Literal>'${refPrn}'</Literal></PropertyIsEqualTo></Filter>`)}`);
+                const lotJson = await lotResp.json();
+                if (lotJson.features && lotJson.features.length > 0) {
+                    const props = lotJson.features[0].properties;
+                    let lotParts = [];
+                    if (props.LotType) lotParts.push(props.LotType);
+                    if (props.LotNumber) lotParts.push(props.LotNumber);
+                    const addPart = (px, v) => { if(v) { let cv = v.toString().trim(); lotParts.push(cv === "(RP)" || cv === "RP" ? "RP" : px + cv); }};
+                    addPart("S.", props.Section1); addPart("SS.", props.SubSection1); addPart("S.", props.Section2); addPart("SS.", props.SubSection2); addPart("S.", props.Section3); addPart("SS.", props.SubSection3); addPart("S.", props.Section4); addPart("", props.Extension); addPart("", props.MiscellaneousItem);
+                    updateUIField('lotNumText', lotParts.join(" "));
+                }
+            } catch (e) {}
+        }
+
+        if (row) {
+            updateUIField('lrAddressText', row.FREE_FORMAT_ADDR_ENG);
+            setResultSummary('Search complete', `${val} · ${row.FREE_FORMAT_ADDR_ENG || 'Address found'}`, '✓');
+            let pStr = row.STREET_NAME_ENG ? row.STREET_NAME_ENG.toString().trim() : "";
+            let pNum = (row.HOUSE_NUM_PREFIX ? row.HOUSE_NUM_PREFIX.toString().trim() : "") + (row.HOUSE_NUM_SUFFIX ? row.HOUSE_NUM_SUFFIX.toString().trim() : "");
+            let cleanAddr = row.FREE_FORMAT_ADDR_ENG ? row.FREE_FORMAT_ADDR_ENG.toUpperCase() : [(row.ESTATE_NAME_ENG||""), (row.BLDG_NAME_ENG||row.BUILDING_NAME_ENG||""), ((pNum===""||dummyNumbers.includes(pNum)) ? pStr : `${pNum} ${pStr}`)].filter(Boolean).join(", ");
+            dummyNumbers.forEach(d => { cleanAddr = cleanAddr.replace(new RegExp(`\\b${d}\\b`, 'g'), ' ').replace(/\s{2,}/g, ' ').trim(); });
+            if (!pStr && row.FREE_FORMAT_ADDR_ENG) { let ex = extractStreetInfo(cleanAddr); if(ex) { pStr = ex.name; pNum = ex.num; } }
+            if (cleanAddr) await fetchALSAndCSDI(cleanAddr, row, pStr, pNum, false);
+        }
+        fallbackClearLoading();
+    }
+
+    async function executeADDRSearch(val, isCode) {
+        prepareUI();
+        await fetchALSAndCSDI(val, null, "", "", isCode);
+        fallbackClearLoading();
+    }
+
+    async function executeBDOpSearch(type, val) {
+        prepareUI();
+        let row = null;
+        
+        // NSEARCH1_E = BuildingStructureID, NSEARCH2_E = OP_No
+        let propName = type === 'BLDG' ? 'NSEARCH1_E' : 'NSEARCH2_E';
+        let filterVal = type === 'BLDG' ? val : `'${escapeXML(val)}'`; 
+        
+        let filterBD = `<Filter><PropertyIsEqualTo><PropertyName>${propName}</PropertyName><Literal>${filterVal}</Literal></PropertyIsEqualTo></Filter>`;
+        let urlBD = `https://portal.csdi.gov.hk/server/services/common/bd_rcd_1631167534872_19764/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=BDBIAR&outputFormat=geojson&count=1&filter=${encodeURIComponent(filterBD)}`;
+
+        try {
+            let res = await fetch(urlBD);
+            let json = await res.json();
+            if (json.features && json.features.length > 0) {
+                row = json.features[0].properties;
+            }
+        } catch (e) { fallbackClearLoading(); return; }
+
+        if (row) {
+            document.getElementById('bdDomainBlock').style.display = 'block';
+            document.getElementById('noBldgDataMsg').style.display = 'none';
+            
+            // Map CSDI keys using the raw CSV column headers
+            let bldgId = row.NSEARCH1_E || (type === 'BLDG' ? val : "");
+            let opNum = row.NSEARCH2_E;
+            let opDate = row.NSEARCH3_E;
+            let permUse = row.NSEARCH5_E;
+            
+            if (bldgId) updateUIField('structureIdText', bldgId);
+            if (opNum) updateUIField('opNoText', opNum);
+            if (permUse) updateUIField('permittedUseText', permUse);
+            if (opDate) { 
+                updateUIField('opDateText', opDate); 
+                let match = String(opDate).match(/\d{4}/); 
+                if (match) updateUIField('ageText', (new Date().getFullYear() - parseInt(match[0])) + " Years"); 
+            }
+
+            if (bldgId) {
+                try {
+                    let url = `https://portal.csdi.gov.hk/server/services/common/landsd_rcd_1637211194312_35158/MapServer/WFSServer?service=wfs&request=GetFeature&typenames=BuildingRelateOPStructure&outputFormat=geojson&count=1&filter=${encodeURIComponent(`<Filter><PropertyIsEqualTo><PropertyName>BuildingStructureID</PropertyName><Literal>${bldgId}</Literal></PropertyIsEqualTo></Filter>`)}`;
+                    let res = await fetch(url); let json = await res.json();
+                    let csuid = "";
+                    if (json.features && json.features.length > 0) {
+                        for (let f of json.features) { if (f.properties && f.properties.BuildingCSUID) { csuid = f.properties.BuildingCSUID; break; } }
+                    }
+                    if (csuid) {
+                        updateUIField('csuidText', csuid);
+                        await fetchALSAndCSDI(csuid, null, "", "", true);
+                        
+                        if (bldgId) updateUIField('structureIdText', bldgId);
+                        if (opNum) updateUIField('opNoText', opNum);
+                        if (opDate) updateUIField('opDateText', opDate);
+                        if (permUse) updateUIField('permittedUseText', permUse);
+                    }
+                } catch (err) {}
+            }
+        }
+        fallbackClearLoading();
+    }
+</script>
+</body>
+</html>
