@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="icon" type="image/png" href="favicon.png">
@@ -67,10 +67,11 @@
         .app-container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100vh; /* Using 100vh works best from cold starts on iOS PWAs */
             max-width: 90vw;
             margin: auto;
-            padding: 16px 20px;
+            /* Dynamically add the iOS top inset to the existing 16px padding */
+            padding: calc(16px + env(safe-area-inset-top)) 20px 16px 20px;
             box-sizing: border-box;
         }
 
@@ -203,7 +204,10 @@
         .icon-copy-btn { min-width: 30px; min-height: 30px; }
 
         @media (max-width: 992px) {
-            .app-container { padding: 8px; }
+            .app-container { 
+                /* Dynamically add the iOS top inset to the existing 8px padding */
+                padding: calc(8px + env(safe-area-inset-top)) 8px 8px 8px; 
+            }
             .app-header { align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; }
             .header-title-area { flex: 1; min-width: 0; }
             .app-brand { gap: 8px; }
