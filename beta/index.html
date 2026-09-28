@@ -221,19 +221,36 @@
                 padding: 0 8px 8px 8px; /* Zero top padding */
             }
             .app-header { 
-                padding-top: calc(8px + env(safe-area-inset-top)); /* Absorbs notch */
-                align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; 
+                /* Added 12px baseline padding for extra breathing room below the notch */
+                padding-top: calc(12px + env(safe-area-inset-top)); 
+                align-items: flex-start; 
+                gap: 8px; 
+                margin-bottom: 12px; 
+                padding-bottom: 8px; 
             }
-            .header-title-area { flex: 1; min-width: 0; }
-            .app-brand { gap: 8px; }
-            .app-logo { width: 30px; height: 30px; border-radius: 7px; }
-            .app-header h2 { font-size: 17px; letter-spacing: -.35px; }
+            
+            /* --- THE CRITICAL FIX --- */
+            .header-title-area { 
+                flex: 1; 
+                min-width: 0; 
+                display: flex; 
+                flex-direction: column; /* Drops the View Toggle to the next line */
+                align-items: flex-start; 
+                gap: 12px; 
+            }
+            /* ------------------------ */
+
+            .app-brand { display: flex; align-items: center; gap: 10px; }
+            .app-logo { width: 32px; height: 32px; border-radius: 7px; flex-shrink: 0; }
+            .app-header h2 { font-size: 17px; line-height: 1.2; letter-spacing: -.35px; margin: 0; }
             .header-subtitle { display: none; }
-            .db-status-wrap { align-items: flex-end; max-width: 44%; }
+            
+            .db-status-wrap { align-items: flex-end; flex-shrink: 0; margin-top: 4px; }
             .db-status-caption { display: none; }
             #dbStatus { font-size: 10px; line-height: 1.2; text-align: right; }
+            
             .view-toggle { flex-shrink: 0; }
-            .view-btn { padding: 6px 10px; font-size: 11px; }
+            .view-btn { padding: 6px 14px; font-size: 12px; }
 
             .search-card { padding: 11px; position: sticky; top: 0; z-index: 2000; }
             .search-top-bar { align-items: stretch; flex-direction: column; gap: 7px; margin-bottom: 8px; }
@@ -451,7 +468,6 @@
                 <img class="app-logo" src="favicon.png" alt="USSE">
                 <div class="header-copy">
                     <h2>Universal Spatial Search Engine</h2>
-                    <div class="header-subtitle">Hong Kong property, address &amp; spatial lookup</div>
                 </div>
             </div>
             <!-- View Toggle -->
