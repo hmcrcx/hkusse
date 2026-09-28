@@ -68,11 +68,10 @@
         .app-container {
             display: flex;
             flex-direction: column;
-            height: 100dvh; /* <-- CHANGED FROM 100vh */
+            height: 100dvh;
             max-width: 90vw;
             margin: auto;
-            /* Use max() to ensure it never gets too tight if safe-area fails */
-            padding: max(16px, env(safe-area-inset-top)) 20px 16px 20px;
+            padding: 0 20px 16px 20px; /* Zero top padding */
             box-sizing: border-box;
         }
 
@@ -81,6 +80,16 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid var(--primary-dark);
+            
+            /* -- iOS 27 BLUR FIX -- */
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-app);
+            padding-top: calc(16px + env(safe-area-inset-top)); /* Absorbs notch */
+            z-index: 3000;
+            transform: translateZ(0); /* Isolates from WebKit blur compositor */
+            /* --------------------- */
+            
             padding-bottom: 10px;
             margin-bottom: 20px; 
             flex-shrink: 0;
@@ -207,10 +216,14 @@
 
         @media (max-width: 992px) {
             .app-container { 
-                height: 100dvh; /* <-- ADD THIS HERE AS WELL */
-                padding: max(8px, env(safe-area-inset-top)) 8px 8px 8px; 
+                height: 100dvh; 
+                max-width: 100vw;
+                padding: 0 8px 8px 8px; /* Zero top padding */
             }
-            .app-header { align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; }
+            .app-header { 
+                padding-top: calc(8px + env(safe-area-inset-top)); /* Absorbs notch */
+                align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; 
+            }
             .header-title-area { flex: 1; min-width: 0; }
             .app-brand { gap: 8px; }
             .app-logo { width: 30px; height: 30px; border-radius: 7px; }
@@ -222,7 +235,7 @@
             .view-toggle { flex-shrink: 0; }
             .view-btn { padding: 6px 10px; font-size: 11px; }
 
-            .search-card { padding: 11px; }
+            .search-card { padding: 11px; position: sticky; top: 0; z-index: 2000; }
             .search-top-bar { align-items: stretch; flex-direction: column; gap: 7px; margin-bottom: 8px; }
             .search-mode-label { display: block; }
             .segmented-control { overflow-x: auto; width: 100%; padding: 3px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -230,7 +243,7 @@
             .tab-btn { flex: 0 0 auto; padding: 7px 11px; font-size: 11px; }
             #detectedTypeBadge { align-self: flex-start; font-size: 10px !important; }
             .search-input-group { gap: 7px; }
-            .search-input-shell input { min-height: 44px; font-size: 16px; padding-right: 58px; } /* <-- CHANGED FROM 15px */            
+            .search-input-shell input { min-height: 44px; font-size: 16px; padding-right: 58px; }
             .search-input-hint { display: none; }
             .search-input-group .action-btn { min-width: 78px; padding: 9px 12px; }
             .search-helper { flex-direction: column; gap: 2px; }
@@ -241,12 +254,13 @@
             #welcomeState h3 { font-size: 19px; }
 
             .mobile-result-toggle { display: inline-flex; align-self: flex-start; background: #e2e8f0; padding: 3px; border-radius: 18px; gap: 2px; margin-bottom: 10px; }
-            .dashboard-layout { flex-direction: column; gap: 12px; }
+            .dashboard-layout { display: flex; flex-direction: column; gap: 12px; }
             .dashboard-layout.mobile-data-view .map-column { display: none; }
             .dashboard-layout.mobile-data-view .data-column { display: block; }
             .dashboard-layout.mobile-map-view .data-column { display: none; }
             .dashboard-layout.mobile-map-view .map-column { display: flex; height: calc(100vh - 205px); min-height: 360px; margin-bottom: 0; }
-            .data-column { padding-right: 0; }
+            .data-column { padding-right: 0; overflow-y: visible; height: auto; }
+            
             .map-quick-actions { top: 8px; right: 8px; gap: 4px; padding: 3px; }
             .map-action-btn { width: 36px; height: 36px; min-width: 36px; padding: 0; justify-content: center; font-size: 14px; }
             .map-action-label { display: none; }
@@ -262,7 +276,7 @@
             .pim-card { padding: 16px 12px; }
             .pim-primary-fields { padding: 10px; }
             .pim-primary-note { margin-bottom: 7px; }
-            .row-2 { gap: 12px; }
+            .row-2, .row-4 { grid-template-columns: 1fr; gap: 15px; }
             .pim-btn { min-height: 44px; }
             .pim-table th, .pim-table td { padding: 11px 12px; font-size: 13px; }
         }
@@ -405,18 +419,7 @@
         }
         .pim-icon-copy-btn:hover { background: #e2e8f0; color: var(--primary-dark); }
         .pim-icon-copy-btn.copied { color: #16a34a !important; background: #dcfce7 !important; }
-
-        @media (max-width: 992px) {
-            html, body { height: auto; overflow-y: auto; overflow-x: hidden; }
-            .app-container { height: auto; max-width: 100vw; padding: 10px; }
-            .header-title-area { flex-direction: column; align-items: flex-start; gap: 10px; }
-            .dashboard-layout { display: none; flex-direction: column; }
-            .dashboard-layout.active { display: flex; }
-            .data-column { overflow-y: visible; height: auto; padding-right: 0; }
-            .map-column { height: 450px; margin-bottom: 50px; }
-            .search-card { position: sticky; top: 0; z-index: 2000; }
-            .row-2, .row-4 { grid-template-columns: 1fr; gap: 15px; }
-        }
+        
     </style>
 </head>
 <body>
