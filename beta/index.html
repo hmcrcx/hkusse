@@ -276,8 +276,8 @@
             /* Ensure primary full-width tiles span across both columns */
             .results-grid .full-width { grid-column: span 2 !important; }
 
-            /* Force long unbroken codes (like CSUID) to wrap tightly within their boxes */
-            .result-value { word-break: break-all !important; overflow-wrap: anywhere !important; }
+            /* Allow normal English word wrapping, but force long unbroken codes to wrap safely */
+            .result-value { word-break: normal !important; overflow-wrap: break-word !important; }
 
             .map-quick-actions { top: 8px; right: 8px; gap: 4px; padding: 3px; }
             .map-action-btn { width: 36px; height: 36px; min-width: 36px; padding: 0; justify-content: center; font-size: 14px; }
