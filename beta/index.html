@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#f4f6f4">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <title>Universal Spatial Search Engine</title>
@@ -67,11 +68,11 @@
         .app-container {
             display: flex;
             flex-direction: column;
-            height: 100vh; /* Using 100vh works best from cold starts on iOS PWAs */
+            height: 100dvh; /* <-- CHANGED FROM 100vh */
             max-width: 90vw;
             margin: auto;
-            /* Dynamically add the iOS top inset to the existing 16px padding */
-            padding: calc(16px + env(safe-area-inset-top)) 20px 16px 20px;
+            /* Use max() to ensure it never gets too tight if safe-area fails */
+            padding: max(16px, env(safe-area-inset-top)) 20px 16px 20px;
             box-sizing: border-box;
         }
 
@@ -206,8 +207,8 @@
 
         @media (max-width: 992px) {
             .app-container { 
-                /* Dynamically add the iOS top inset to the existing 8px padding */
-                padding: calc(8px + env(safe-area-inset-top)) 8px 8px 8px; 
+                height: 100dvh; /* <-- ADD THIS HERE AS WELL */
+                padding: max(8px, env(safe-area-inset-top)) 8px 8px 8px; 
             }
             .app-header { align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; }
             .header-title-area { flex: 1; min-width: 0; }
@@ -229,7 +230,8 @@
             .tab-btn { flex: 0 0 auto; padding: 7px 11px; font-size: 11px; }
             #detectedTypeBadge { align-self: flex-start; font-size: 10px !important; }
             .search-input-group { gap: 7px; }
-            .search-input-shell input { min-height: 44px; font-size: 16px; padding-right: 58px; } /* <-- CHANGED FROM 15px */            .search-input-hint { display: none; }
+            .search-input-shell input { min-height: 44px; font-size: 16px; padding-right: 58px; } /* <-- CHANGED FROM 15px */            
+            .search-input-hint { display: none; }
             .search-input-group .action-btn { min-width: 78px; padding: 9px 12px; }
             .search-helper { flex-direction: column; gap: 2px; }
             .shortcut-hint { display: none; }
