@@ -267,8 +267,17 @@
             .dashboard-layout.mobile-map-view .map-column { display: flex !important; height: calc(100vh - 205px); min-height: 360px; margin-bottom: 0; width: 100% !important; }
             .data-column { padding-right: 0; overflow-y: visible; height: auto; }
             
-            /* Fix squished inner cards to force 1-column layout */
-            .results-grid, .grid-3-col { grid-template-columns: 1fr !important; }
+            /* Force exact 50/50 split for 2 columns, ignoring content width */
+            .results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            
+            /* Ensure the 3-column BD grid also wraps neatly into the 50/50 layout on mobile */
+            .grid-3-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            
+            /* Ensure primary full-width tiles span across both columns */
+            .results-grid .full-width { grid-column: span 2 !important; }
+
+            /* Force long unbroken codes (like CSUID) to wrap tightly within their boxes */
+            .result-value { word-break: break-all !important; overflow-wrap: anywhere !important; }
 
             .map-quick-actions { top: 8px; right: 8px; gap: 4px; padding: 3px; }
             .map-action-btn { width: 36px; height: 36px; min-width: 36px; padding: 0; justify-content: center; font-size: 14px; }
