@@ -126,7 +126,8 @@
         /* Unified Input Styling for BOTH views */
         .search-input-group input, .pim-input {
             width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px;
-            font-size: 15px; background-color: var(--bg-input); color: var(--text-main); font-weight: 600;
+            font-size: 16px; /* <-- CHANGED FROM 15px */
+            background-color: var(--bg-input); color: var(--text-main); font-weight: 600;
             box-sizing: border-box; transition: all 0.2s ease;
         }
         .search-input-group input:focus, .pim-input:focus { 
@@ -228,8 +229,7 @@
             .tab-btn { flex: 0 0 auto; padding: 7px 11px; font-size: 11px; }
             #detectedTypeBadge { align-self: flex-start; font-size: 10px !important; }
             .search-input-group { gap: 7px; }
-            .search-input-shell input { min-height: 44px; font-size: 15px; padding-right: 58px; }
-            .search-input-hint { display: none; }
+            .search-input-shell input { min-height: 44px; font-size: 16px; padding-right: 58px; } /* <-- CHANGED FROM 15px */            .search-input-hint { display: none; }
             .search-input-group .action-btn { min-width: 78px; padding: 9px 12px; }
             .search-helper { flex-direction: column; gap: 2px; }
             .shortcut-hint { display: none; }
