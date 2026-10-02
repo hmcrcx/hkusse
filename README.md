@@ -27,12 +27,11 @@ For the absolute best experience on your phone, you can install it directly to y
 
 ## 📸 Screenshots
 
-| Desktop Dashboard |
-| :---: |
-| :---: |
-| ![Desktop View](docs/assets/desktop-view.png) |
-| Mobile App View |
-| ![Mobile View](docs/assets/mobile-view.png) |
+**Desktop Dashboard**  
+![Desktop View](docs/assets/desktop-view.png)
+
+**Mobile App View**  
+![Mobile View](docs/assets/mobile-view.png)
 
 ---
 *Disclaimer: Data is aggregated from public sources. Always verify critical property metrics with official Land Registry documents.*
