@@ -1,6 +1,9 @@
 # Universal Spatial Search Engine 🌍🔍
 
-**[👉 Click here to launch the app](https://hmcrcx.github.io/hkusse/)**
+**[👉 Click here to launch the app](https://hmcrcx.github.io/universal-spatial-search-engine/)**  
+Or scan the QR code below to open it instantly on your phone:
+
+<img src="qrcode.png" alt="QR Code" width="120">
 
 The Universal Spatial Search Engine is a fast, easy-to-use tool for looking up Hong Kong property, address, and spatial data. Whether you are at your office desktop or on your phone out in the field, this tool instantly cross-references multiple government databases to give you the exact property details you need.
 
