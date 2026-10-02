@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#f4f6f4">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <title>Universal Spatial Search Engine</title>
@@ -81,15 +80,16 @@
             align-items: center;
             border-bottom: 2px solid var(--primary-dark);
             
-            /* -- FIXED FROSTED LIQUID GLASS -- */
+            /* -- THE FROSTED GLASS LOCK -- */
+            position: -webkit-sticky;
             position: sticky;
             top: 0;
-            background-color: rgba(244, 246, 244, 0.7); /* Lowered opacity for true translucency */
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            background-color: rgba(244, 246, 244, 0.75); /* Translucent background */
+            -webkit-backdrop-filter: blur(20px) saturate(180%); /* WebKit explicitly required for iOS */
             backdrop-filter: blur(20px) saturate(180%);
             padding-top: calc(16px + env(safe-area-inset-top)); 
             z-index: 3000;
-            /* -------------------------------- */
+            /* ---------------------------- */
             
             padding-bottom: 10px;
             margin-bottom: 20px; 
@@ -216,13 +216,14 @@
         .icon-copy-btn { min-width: 30px; min-height: 30px; }
 
         @media (max-width: 992px) {
-            /* 1. Scrolling Fix: Removed 'overflow-x: hidden' from body which breaks position: sticky! */
-            html, body { height: auto; overflow-y: auto; overflow-x: visible; }
-            .app-container { height: auto; min-height: 100dvh; max-width: 100vw; padding: 0 8px 8px 8px; overflow-x: clip; }
+            /* 1. CRITICAL iOS STICKY FIX: overflow MUST be visible on body/html */
+            html, body { height: auto; overflow: visible !important; }
+            .app-container { height: auto; min-height: 100dvh; max-width: 100vw; padding: 0 8px 8px 8px; overflow: visible !important; }
             
+            /* 2. HEADER PADDING: 24px pushes title below the native iOS blur zone */
             .app-header { 
                 margin-left: -8px; margin-right: -8px; padding-left: 8px; padding-right: 8px;
-                padding-top: calc(12px + env(safe-area-inset-top)); 
+                padding-top: calc(24px + env(safe-area-inset-top)); 
                 align-items: flex-start; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; 
             }
             .header-title-area { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -236,7 +237,6 @@
             .view-toggle { flex-shrink: 0; }
             .view-btn { padding: 6px 14px; font-size: 12px; }
 
-            /* 2. REMOVE STICKY FROM SEARCH CARD (Unblocks the Liquid Glass effect!) */
             .search-card { padding: 11px; position: static; } 
             .search-top-bar { align-items: stretch; flex-direction: column; gap: 7px; margin-bottom: 8px; }
             .search-mode-label { display: block; }
@@ -257,7 +257,6 @@
 
             .mobile-result-toggle { display: inline-flex; align-self: flex-start; background: #e2e8f0; padding: 3px; border-radius: 18px; gap: 2px; margin-bottom: 10px; }
             
-            /* 3. AGGRESSIVE GRID OVERRIDE TO FIX SQUISHED COLUMNS */
             .dashboard-layout { display: none; }
             .dashboard-layout.active { display: flex !important; flex-direction: column !important; gap: 12px; } 
             
@@ -265,18 +264,15 @@
             .dashboard-layout.mobile-data-view .data-column { display: block !important; width: 100% !important; }
             .dashboard-layout.mobile-map-view .data-column { display: none !important; }
             .dashboard-layout.mobile-map-view .map-column { display: flex !important; height: calc(100vh - 205px); min-height: 360px; margin-bottom: 0; width: 100% !important; }
-            .data-column { padding-right: 0; overflow-y: visible; height: auto; }
             
-            /* Force exact 50/50 split for 2 columns, ignoring content width */
+            /* 3. SCROLLING LOCK RELEASE: Allows content to pass behind header */
+            #usseView, #pimView, .data-column { overflow: visible !important; height: auto !important; }
+            .data-column { padding-right: 0; }
+            
+            /* Grid structure */
             .results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-            
-            /* Ensure the 3-column BD grid also wraps neatly into the 50/50 layout on mobile */
             .grid-3-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-            
-            /* Ensure primary full-width tiles span across both columns */
             .results-grid .full-width { grid-column: span 2 !important; }
-
-            /* Allow normal English word wrapping, but force long unbroken codes to wrap safely */
             .result-value { word-break: normal !important; overflow-wrap: break-word !important; }
 
             .map-quick-actions { top: 8px; right: 8px; gap: 4px; padding: 3px; }
