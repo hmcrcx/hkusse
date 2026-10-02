@@ -29,9 +29,9 @@ For the absolute best experience on your phone, you can install it directly to y
 
 | Desktop Dashboard |
 | :---: |
+| :---: |
 | ![Desktop View](docs/assets/desktop-view.png) |
 | Mobile App View |
-| :---: |
 | ![Mobile View](docs/assets/mobile-view.png) |
 
 ---
