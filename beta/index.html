@@ -13,10 +13,12 @@
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <!-- Leaflet Map CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- NEW: Leaflet Gesture Handling for 2-finger mobile pan -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" type="text/css">
-    <script src="https://unpkg.com/leaflet-gesture-handling"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- FIX: Leaflet Gesture Handling (Explicit Browser Bundle) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-gesture-handling@1.2.2/dist/leaflet-gesture-handling.min.css" type="text/css">
+    <script src="https://unpkg.com/leaflet-gesture-handling@1.2.2/dist/leaflet-gesture-handling.min.js"></script>
+    
     <!-- Proj4js for Coordinate Conversion (HK1980 to WGS84) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
 
@@ -1885,7 +1887,11 @@
         currentLng = wgs84Coords[0]; currentLat = wgs84Coords[1];
 
         if (!miniMap) {
-            miniMap = L.map('mapContainer', { zoomControl: true, attributionControl: false, gestureHandling: true }).setView([currentLat, currentLng], 18);
+            miniMap = L.map('mapContainer', { 
+                zoomControl: true, 
+                attributionControl: false, 
+                gestureHandling: true 
+            }).setView([currentLat, currentLng], 18);
             L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(miniMap);
             labelLayerEng = L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/en/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 });
             labelLayerChi = L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 });
