@@ -13,6 +13,9 @@
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <!-- Leaflet Map CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- NEW: Leaflet Gesture Handling for 2-finger mobile pan -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" type="text/css">
+    <script src="https://unpkg.com/leaflet-gesture-handling"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Proj4js for Coordinate Conversion (HK1980 to WGS84) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
@@ -534,16 +537,6 @@
 
         <div class="dashboard-layout mobile-data-view" id="resultsContainer">
             <div class="data-column">
-                <div class="result-summary" id="resultSummary">
-                    <div class="result-summary-icon">✓</div>
-                    <div>
-                        <div class="result-summary-title" id="resultSummaryTitle">Search results ready</div>
-                        <div class="result-summary-text" id="resultSummaryText">--</div>
-                    </div>
-                    <div class="result-summary-actions">
-                        <button class="summary-action" onclick="viewResultMap()">View map</button>
-                    </div>
-                </div>
                 <!-- ACCORDION 1: ADDRESS -->
                 <details class="accordion" open>
                     <summary>Address Data <span class="arrow">▼</span></summary>
@@ -1892,7 +1885,7 @@
         currentLng = wgs84Coords[0]; currentLat = wgs84Coords[1];
 
         if (!miniMap) {
-            miniMap = L.map('mapContainer', { zoomControl: true, attributionControl: false }).setView([currentLat, currentLng], 18);
+            miniMap = L.map('mapContainer', { zoomControl: true, attributionControl: false, gestureHandling: true }).setView([currentLat, currentLng], 18);
             L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(miniMap);
             labelLayerEng = L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/en/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 });
             labelLayerChi = L.tileLayer('https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png', { maxZoom: 20 });
